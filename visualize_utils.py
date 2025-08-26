@@ -1,6 +1,6 @@
-"""Visualization utilities re-exported from utils module."""
+"""Visualization utilities re-exported from core statistical utilities."""
 
-from .utils import (
+from utils import (
     view_subgraph,
     view_independence_subgraph,
     plot_contingency_table,
