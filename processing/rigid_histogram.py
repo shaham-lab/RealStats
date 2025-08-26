@@ -193,6 +193,22 @@ class RIGIDDinoV2Histogram(RIGIDCLSHistogram):
 
     def get_embedding(self, outputs):
         return outputs.last_hidden_state  # shape: [B, seq_len, dim]
+
+
+class RIGIDDinoV3Histogram(RIGIDCLSHistogram):
+    """RIGID statistic using DINOv3 vision backbone."""
+
+    def __init__(self, model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.05):
+        super().__init__(model_name=model_name, noise_level=noise_level)
+
+    def load_processor(self):
+        return AutoImageProcessor.from_pretrained(self.model_name, do_rescale=False, use_fast=True)
+
+    def load_model(self):
+        return AutoModel.from_pretrained(self.model_name)
+
+    def get_embedding(self, outputs):
+        return outputs.last_hidden_state  # shape: [B, seq_len, dim]
     
 class RIGIDEVAHistogram(RIGIDCLSHistogram):
     def __init__(self, noise_level=0.05):

@@ -73,6 +73,40 @@ STATISTIC_HISTOGRAMS = {
     'RIGID.DINO.75':  lambda level: RIGIDDinoV2Histogram(noise_level=0.75)  if level == 0 else None,
     'RIGID.DINO.100': lambda level: RIGIDDinoV2Histogram(noise_level=1.0)   if level == 0 else None,
 
+    # ===== DINOv3 =====
+    # --- ViT-7B/16 ---
+    'RIGID.DINOV3.VIT7B16.001': lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.001) if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.01':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.01)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.05':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.05)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.10':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.10)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.20':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.20)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.30':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.30)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.50':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.50)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.75':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=0.75)  if level == 0 else None,
+    'RIGID.DINOV3.VIT7B16.100': lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vit7b16-pretrain-lvd1689m", noise_level=1.0)   if level == 0 else None,
+
+    # --- ViT-S/16 ---
+    'RIGID.DINOV3.VITS16.001': lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.001) if level == 0 else None,
+    'RIGID.DINOV3.VITS16.01':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.01)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.05':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.05)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.10':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.10)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.20':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.20)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.30':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.30)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.50':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.50)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.75':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=0.75)  if level == 0 else None,
+    'RIGID.DINOV3.VITS16.100': lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-vits16-pretrain-lvd1689m", noise_level=1.0)   if level == 0 else None,
+
+    # --- ConvNeXt-Small ---
+    'RIGID.DINOV3.CONVNEXTSMALL.001': lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.001) if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.01':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.01)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.05':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.05)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.10':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.10)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.20':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.20)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.30':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.30)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.50':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.50)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.75':  lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=0.75)  if level == 0 else None,
+    'RIGID.DINOV3.CONVNEXTSMALL.100': lambda level: RIGIDDinoV3Histogram(model_name="facebook/dinov3-convnext-small-pretrain-lvd1689m", noise_level=1.0)   if level == 0 else None,
+
     # ===== EVA =====
     'RIGID.EVA.001': lambda level: RIGIDEVAHistogram(noise_level=0.001) if level == 0 else None,
     'RIGID.EVA.01':  lambda level: RIGIDEVAHistogram(noise_level=0.01)  if level == 0 else None,
