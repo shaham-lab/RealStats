@@ -71,61 +71,102 @@ def get_unique_id(patch_size, level, statistic, seed=42):
     return f"PatchProcessing_statistic={statistic}_level={level}_patch_size={patch_size}_seed={seed}"
 
 
-def preprocess_statistic(dataset, batch_size, statistic, level, num_data_workers, patch_size, pkl_dir, data_type: DataType, seed=42):
-    """Preprocess the dataset for a single statistic name and level using various histogram statistics."""
+def preprocess_statistic(dataset, batch_size, statistic, level, num_data_workers, patch_size, pkl_dir, data_type: DataType, seed=42, preload_workers=8, io_workers=128):
+    """Preprocess the dataset for a single statistic name and level using various histogram statistics.
+
+    This version aggressively caches and parallelises I/O so that subsequent
+    runs skip recomputation.  It also performs atomic writes which makes it
+    safer to call from multiple processes simultaneously.
+    """
+
     set_seed(seed)
 
     unique_id = get_unique_id(patch_size, level, statistic, seed)
-    combo_dir = os.path.join(pkl_dir, unique_id)
-    results = []
+    statistics_root_dir = os.path.join(pkl_dir, unique_id)
 
-    expected_stat_paths = [
-        os.path.join(combo_dir, os.path.splitext(os.path.abspath(p).lstrip(os.sep))[0] + ".npy")
-        for p in dataset.image_paths
-    ]
+    def stat_path(image_path: str) -> str:
+        relative = os.path.splitext(os.path.abspath(image_path).lstrip(os.sep))[0] + ".npy"
+        return os.path.join(statistics_root_dir, relative)
 
-    if all(os.path.exists(sp) for sp in expected_stat_paths):
-        results = [np.load(sp, mmap_mode="r") for sp in expected_stat_paths]
-        stacked = np.stack(results, axis=0)
-        return stacked
-    
+    image_paths = list(dataset.image_paths)
+    statistic_paths = [stat_path(p) for p in image_paths]
+
+    # ------------------------------------------------------------------
+    # 1) Preload existing .npy files
+    # ------------------------------------------------------------------
+    preloaded = [None] * len(statistic_paths)
+    indices_to_preload = [i for i, p in enumerate(statistic_paths) if os.path.exists(p)]
+
+    if indices_to_preload:
+        with ThreadPoolExecutor(max_workers=preload_workers) as pool:
+            futures = {
+                pool.submit(np.load, statistic_paths[i], mmap_mode="r", allow_pickle=False): i
+                for i in indices_to_preload
+            }
+            for fut in as_completed(futures):
+                idx = futures[fut]
+                try:
+                    preloaded[idx] = fut.result()
+                except Exception:
+                    preloaded[idx] = None  # fall back to recomputation
+
+    if all(v is not None for v in preloaded):
+        return np.stack(preloaded, axis=0)
+
+    # ------------------------------------------------------------------
+    # 2) Build lookup and dataloader (ordered)
+    # ------------------------------------------------------------------
+    absolute_index = {os.path.abspath(p): i for i, p in enumerate(image_paths)}
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_data_workers)
 
     histogram_generator = get_histogram_generator(statistic, level)
     if histogram_generator is None:
         return None
 
-    for images, _, paths in tqdm(data_loader, desc=f"Processing {statistic}-{level}", unit="batch", total=len(data_loader), leave=False):
-        B, P = images.shape[:2]
+    # ------------------------------------------------------------------
+    # 3) Compute only missing statistics and save in parallel
+    # ------------------------------------------------------------------
+    for batch_images, _ignored, batch_paths in data_loader:
+        num_patches = batch_images.shape[1]
+        batch_abs_paths = [os.path.abspath(p) for p in batch_paths]
+        batch_dataset_indices = [absolute_index[p] for p in batch_abs_paths]
 
-        cached = [None] * B
-        to_compute = []
+        missing_positions = [pos for pos, idx in enumerate(batch_dataset_indices) if preloaded[idx] is None]
+        if not missing_positions:
+            continue
 
-        for i, path in enumerate(paths):
-            stat_path = os.path.join(combo_dir, os.path.splitext(os.path.abspath(path).lstrip(os.sep))[0] + ".npy")
-            if os.path.exists(stat_path):
-                cached[i] = np.load(stat_path)
-            else:
-                to_compute.append((i, path, stat_path))
+        missing_images = batch_images[missing_positions].view(
+            len(missing_positions) * num_patches, *batch_images.shape[2:]
+        )
+        missing_images = missing_images.to(histogram_generator.device, non_blocking=True)
 
-        if to_compute:
-            idxs = [i for i, _, _ in to_compute]
-            imgs = images[idxs].view(len(idxs) * P, *images.shape[2:])
-            imgs = imgs.to(histogram_generator.device)
-            hist = histogram_generator.preprocess(imgs)
-            torch.cuda.empty_cache()
-            hist = hist.reshape(len(idxs), P)
+        with torch.no_grad():
+            histograms = histogram_generator.preprocess(missing_images)
+        torch.cuda.empty_cache()
+        histograms = np.asarray(histograms).reshape(len(missing_positions), num_patches)
 
-            for (i, _, stat_path), h in zip(to_compute, hist):
-                os.makedirs(os.path.dirname(stat_path), exist_ok=True)
-                np.save(stat_path, h)
-                cached[i] = h
+        save_targets, dir_set = [], set()
+        for local_pos, histogram_array in zip(missing_positions, histograms):
+            dataset_index = batch_dataset_indices[local_pos]
+            target_path = statistic_paths[dataset_index]
+            preloaded[dataset_index] = histogram_array
+            dir_set.add(os.path.dirname(target_path))
+            save_targets.append((target_path, histogram_array))
 
-        results.extend(cached)
+        for d in dir_set:
+            os.makedirs(d, exist_ok=True)
 
-    stacked = np.stack(results, axis=0)
+        def save_numpy(pair):
+            path, arr = pair
+            tmp_path = f"{path}.{os.getpid()}.tmp"
+            np.save(tmp_path, arr, allow_pickle=False)
+            os.replace(tmp_path, path)
 
-    return stacked
+        with ThreadPoolExecutor(max_workers=io_workers) as pool:
+            list(pool.map(save_numpy, save_targets))
+
+    assert all(v is not None for v in preloaded), "Some items were not computed or loaded."
+    return np.stack(preloaded, axis=0)
 
 
 def fdr_classification(pvalues, threshold=0.05):
