@@ -34,6 +34,7 @@ parser.add_argument('--run_id', type=str, required=True, help='Unique identifier
 parser.add_argument('--experiment_id', type=str, required=True, help='Name or ID of the MLflow experiment.')
 parser.add_argument('--statistics_keys', type=str, nargs='+', required=True, help='Statistics keys group (all statistics to evaluate)')
 parser.add_argument('--p_threshold', type=float, default=0.05, help='P-value threshold for independence graph')
+parser.add_argument('--preferred_statistics', type=str, nargs='*', default=None, help='Statistics to prioritize when selecting the independent clique.')
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
@@ -96,7 +97,8 @@ def main():
             test_type=TestType.BOTH,
             p_threshold=args.p_threshold,
             logger=mlflow,
-            seed=args.seed
+            seed=args.seed,
+            preferred_statistics=args.preferred_statistics
         )
 
         results['labels'] = labels

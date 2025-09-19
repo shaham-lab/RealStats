@@ -53,6 +53,7 @@ parser.add_argument('--uniform_p_threshold', type=float, default=0.05, help='KS 
 parser.add_argument('--calibration_auc_threshold', type=float, default=0.5, help='Threshold for calibration AUC to filter unreliable tests.')
 parser.add_argument('--ks_pvalue_abs_threshold', type=float, default=0.4, help='Absolute KS p-value threshold for uniformity filtering.')
 parser.add_argument('--minimal_p_threshold', type=float, default=0.05, help='Minimum p-value threshold for chi-square filtering.')
+parser.add_argument('--preferred_statistics', type=str, nargs='*', default=None, help='Statistics to prioritize when selecting the independent clique.')
 parser.add_argument('--gpu', type=str, default='1', help='GPU device(s) to use, e.g., "0", "1", or "0,1".')
 parser.add_argument('--run_id', type=str, default='none', help='Unique identifier for this MLflow run.')
 parser.add_argument('--experiment_id', type=str, default='default', help='Name or ID of the MLflow experiment.')
@@ -137,7 +138,8 @@ def main():
             minimal_p_threshold=args.minimal_p_threshold,
             test_type=TestType.BOTH,
             logger=mlflow,
-            seed=args.seed
+            seed=args.seed,
+            preferred_statistics=args.preferred_statistics
         )
 
         results['labels'] = labels

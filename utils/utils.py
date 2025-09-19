@@ -1771,34 +1771,62 @@ def finding_optimal_uncorrelated_subgroup(keys, corr_matrix, pvals_matrix, ensem
 
 def finding_optimal_independent_subgroup_deterministic(
     keys, chi2_p_matrix, pvals_matrix, ensemble_test, fake_pvals_matrix,
-    ks_pvalue_abs_threshold=0.25, minimal_p_threshold=0.05):
-    """Deterministic search over cliques based on KS range and AUC."""
-    best_group = None
-    best_results = None
+    ks_pvalue_abs_threshold=0.25, minimal_p_threshold=0.05, preferred_statistics=None):
+    """Deterministic search over cliques based on KS range and AUC, favoring preferred statistics."""
+
+    preferred_lookup = {
+        token.lower()
+        for stat in preferred_statistics or ()
+        if stat is not None and (token := str(stat).strip())
+    }
+    preferred_total = len(preferred_lookup)
     optimization_data = {'thresholds': [], 'ks_pvalues': [], 'num_tests': []}
-    cliques = find_largest_independent_group_iterative(keys, chi2_p_matrix,
-                                                       p_threshold=minimal_p_threshold,
-                                                       test_type="cramer_v")
+    candidates = []
+    cliques = find_largest_independent_group_iterative(
+        keys, chi2_p_matrix, p_threshold=minimal_p_threshold, test_type="cramer_v")
     for clique in tqdm(cliques, total=len(cliques), desc="Searching for optimial clique..."):
         independent_keys_group = list(clique)
         num_independent_tests = len(independent_keys_group)
         independent_indices = [keys.index(key) for key in independent_keys_group]
         independent_pvals = pvals_matrix[independent_indices].T
-        ensembled_stats, ensembled_pvals = perform_ensemble_testing(independent_pvals, ensemble_test)
+        _, ensembled_pvals = perform_ensemble_testing(independent_pvals, ensemble_test)
         ensembled_pvals_subsampled = np.random.choice(ensembled_pvals, size=1000, replace=False)
         _, ks_pvalue = kstest(ensembled_pvals_subsampled, 'uniform', args=(0, 1))
-        if abs(ks_pvalue - 0.5) <= ks_pvalue_abs_threshold:
-            optimization_data['thresholds'].append(minimal_p_threshold)
-            optimization_data['ks_pvalues'].append(ks_pvalue)
-            optimization_data['num_tests'].append(num_independent_tests)
-            if not best_group or num_independent_tests > best_results['best_N']:
-                best_group = independent_keys_group
-                best_results = {
-                    'best_KS': ks_pvalue,
-                    'best_N': num_independent_tests,
-                    'best_alpha_threshold': minimal_p_threshold,
-                }
-    if not best_group:
+        ks_deviation = abs(ks_pvalue - 0.5)
+        if ks_deviation > ks_pvalue_abs_threshold:
+            continue
+        optimization_data['thresholds'].append(minimal_p_threshold)
+        optimization_data['ks_pvalues'].append(ks_pvalue)
+        optimization_data['num_tests'].append(num_independent_tests)
+        matched_preferred = {
+            preferred_token
+            for preferred_token in preferred_lookup
+            if any(preferred_token in key.lower() for key in independent_keys_group)
+        }
+        candidates.append({
+            'group': independent_keys_group,
+            'size': num_independent_tests,
+            'ks_pvalue': ks_pvalue,
+            'ks_deviation': ks_deviation,
+            'matched_preferred': matched_preferred,
+        })
+    if not candidates:
         raise ValueError("No valid groups found within the KS p-value range")
-    return best_group, best_results, optimization_data
+    if preferred_total:
+        key_fn = lambda c: (len(c['matched_preferred']), c['size'])
+    else:
+        key_fn = lambda c: (c['size'],)
+    best_candidate = max(candidates, key=key_fn)
+    best_results = {
+        'best_KS': best_candidate['ks_pvalue'],
+        'best_N': best_candidate['size'],
+        'best_alpha_threshold': minimal_p_threshold,
+    }
+    if preferred_total:
+        preferred_hits = len(best_candidate['matched_preferred'])
+        best_results['preferred_hits'] = preferred_hits
+        best_results['preferred_total'] = preferred_total
+        best_results['preferred_coverage_ratio'] = preferred_hits / preferred_total
+        best_results['preferred_missing'] = preferred_total - preferred_hits
+    return best_candidate['group'], best_results, optimization_data
 

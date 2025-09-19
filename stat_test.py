@@ -278,7 +278,8 @@ def main_multiple_patch_test(
     test_type=TestType.LEFT,
     minimal_p_threshold=0.05,
     logger=None,
-    seed=42
+    seed=42,
+    preferred_statistics=None
 ):
     """Run test for number of patches and collect sensitivity and specificity results."""
     print(f"Running test with: \npatches sizes: {patch_sizes}\nstatistics: {statistics}\nlevels: {wavelet_levels}")
@@ -335,14 +336,17 @@ def main_multiple_patch_test(
         ensemble_test=ensemble_test,
         fake_pvals_matrix=None,
         ks_pvalue_abs_threshold=ks_pvalue_abs_threshold,
-        minimal_p_threshold=minimal_p_threshold
+        minimal_p_threshold=minimal_p_threshold,
+        preferred_statistics=preferred_statistics
     )
-    
+
     print(f'Relexation largest clique approximation: {largest_independent_clique_size_approximation}')
 
     if logger:
         logger.log_param("num_tests", len(reference_histogram.keys()))
         logger.log_param("Independent keys", independent_keys_group)
+        if preferred_statistics:
+            logger.log_param("preferred_statistics", preferred_statistics)
         logger.log_metric("largest_independent_clique_size_approximation", largest_independent_clique_size_approximation)
         logger.log_metrics(best_results)
 
@@ -597,7 +601,8 @@ def inference_multiple_patch_test_with_dependence(
     p_threshold=0.05,
     test_type=TestType.LEFT,
     logger=None,
-    seed=42
+    seed=42,
+    preferred_statistics=None
 ):
     """Inference pipeline that automatically finds an independent subset using max clique."""
     print(f"[INFO] Running inference with dependence analysis: {statistics_keys_group}")
@@ -646,17 +651,18 @@ def inference_multiple_patch_test_with_dependence(
 
     chi2_duration = (time.time() - start_time) * 1000  # in ms
 
-    independent_keys_group = find_largest_independent_group_with_plot(keys, chi2_p_matrix, p_threshold, output_dir)
+    initial_independent_group = find_largest_independent_group_with_plot(keys, chi2_p_matrix, p_threshold, output_dir)
 
     start_time = time.time()
-    _, _, _ = finding_optimal_independent_subgroup_deterministic(
+    independent_keys_group, best_results, _ = finding_optimal_independent_subgroup_deterministic(
         keys=keys,
         chi2_p_matrix=chi2_p_matrix,
         pvals_matrix=tuning_pvalue_distributions,
         ensemble_test=ensemble_test,
         fake_pvals_matrix=None,
         ks_pvalue_abs_threshold=0.5,
-        minimal_p_threshold=0.05
+        minimal_p_threshold=0.05,
+        preferred_statistics=preferred_statistics
     )
     clique_duration = (time.time() - start_time) * 1000  # in ms
 
@@ -667,10 +673,15 @@ def inference_multiple_patch_test_with_dependence(
     if logger:
         logger.log_param("num_tests", len(real_population_histogram.keys()))
         logger.log_param("Independent keys", independent_keys_group)
+        if preferred_statistics:
+            logger.log_param("preferred_statistics", preferred_statistics)
+        logger.log_param("initial_clique_estimate", initial_independent_group)
         logger.log_metric("graph_reconstruction_and_max_clique_timer", clique_duration)
         logger.log_metric("chi2_pair_wise_timer", chi2_duration)
         logger.log_metric("real_population_histogram_MB", round(hist_size_mb, 2))
         logger.log_metric("real_population_cdfs_MB", round(cdf_size_mb, 2))
+        if best_results:
+            logger.log_metrics(best_results)
 
     independent_indices = [keys.index(value) for value in independent_keys_group]
     tuning_independent_pvals = tuning_pvalue_distributions[independent_indices].T
