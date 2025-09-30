@@ -46,9 +46,18 @@ parser.add_argument('--experiment_id', type=str, required=True, help='Name or ID
 parser.add_argument('--independent_keys', type=str, nargs='+', required=True, help='Independent statistics keys group')
 parser.add_argument('--inference_aug', type=str, default='none', choices=['none', 'jpeg', 'blur'], help='Apply augmentation to inference dataset (jpeg or blur).')
 parser.add_argument('--draw_pvalues_trend_figure', type=int, default=0, help='whether to draw p-values trend figure')
+parser.add_argument(
+    '--latent_noise_csv',
+    type=str,
+    default=None,
+    help='Path to the CSV file with LatentNoiseCriterion_original scores.',
+)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+
+if args.latent_noise_csv:
+    os.environ["LATENT_NOISE_CRITERION_ORIGINAL_CSV"] = os.path.abspath(args.latent_noise_csv)
 
     
 def main():

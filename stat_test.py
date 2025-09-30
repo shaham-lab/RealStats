@@ -9,6 +9,7 @@ import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from statistics_factory import get_histogram_generator
+from processing.manifold_bias_histogram import PathBasedStatistic
 from utils import (
     AUC_tests_filter,
     compute_cdf,
@@ -99,6 +100,8 @@ def preprocess_statistic(dataset, batch_size, statistic, level, num_data_workers
     if histogram_generator is None:
         return None
 
+    is_path_based = isinstance(histogram_generator, PathBasedStatistic)
+
     for images, _, paths in tqdm(data_loader, desc=f"Processing {statistic}-{level}", unit="batch", total=len(data_loader), leave=False):
         B, P = images.shape[:2]
 
@@ -114,10 +117,16 @@ def preprocess_statistic(dataset, batch_size, statistic, level, num_data_workers
 
         if to_compute:
             idxs = [i for i, _, _ in to_compute]
-            imgs = images[idxs].view(len(idxs) * P, *images.shape[2:])
-            imgs = imgs.to(histogram_generator.device)
-            hist = histogram_generator.preprocess(imgs)
-            hist = hist.reshape(len(idxs), P)
+
+            if is_path_based:
+                lookup_paths = [path for _, path, _ in to_compute]
+                scores = histogram_generator.lookup(lookup_paths)
+                hist = np.repeat(np.asarray(scores, dtype=np.float32)[:, None], P, axis=1)
+            else:
+                imgs = images[idxs].view(len(idxs) * P, *images.shape[2:])
+                imgs = imgs.to(histogram_generator.device)
+                hist = histogram_generator.preprocess(imgs)
+                hist = hist.reshape(len(idxs), P)
 
             for (i, _, stat_path), h in zip(to_compute, hist):
                 os.makedirs(os.path.dirname(stat_path), exist_ok=True)

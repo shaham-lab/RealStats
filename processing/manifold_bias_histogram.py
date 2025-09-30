@@ -1,10 +1,16 @@
 from diffusers import DDPMScheduler, StableDiffusionPipeline
+import os
 import torch
 import torch.nn.functional as F
 import numpy as np
 import torchvision
 import torchvision.transforms.functional as F
 from transformers import AutoImageProcessor, CLIPModel, pipeline as pipeline_caption
+import pandas as pd
+from pathlib import Path
+from typing import Dict, Iterable, List, Union
+from tqdm import tqdm
+
 from processing.histograms import BaseHistogram
 
 
@@ -199,7 +205,12 @@ class LatentNoiseCriterion(BaseHistogram):
         """ Add noise to latents using the diffusion scheduler. """
         timestep = time_frac * self.scheduler.config.num_train_timesteps
         timestep_tensor = torch.full((latents.shape[0],), timestep, device=self.device, dtype=torch.long)
-        return self.scheduler.add_noise(original_samples=latents, noise=spherical_noise, timesteps=timestep_tensor).half(), timestep_tensor
+        return self.scheduler.add_noise(
+            original_samples=latents,
+            noise=spherical_noise,
+            timesteps=timestep_tensor,
+        ).half(), timestep_tensor
+
 
     def predict_noise(self, noisy_latents, timestep, text_emb):
         """ Predict noise using UNet model. """
@@ -249,3 +260,101 @@ class LatentNoiseCriterion(BaseHistogram):
         d_clip = 512
         sqrt_d_clip = d_clip ** 0.5
         return 1 + (sqrt_d_clip * stats["bias_mean"] - stats["D_mean"] + stats["kappa_mean"]) / (sqrt_d_clip + 2)
+
+
+class PathBasedStatistic(BaseHistogram):
+    """Utility base class for statistics that rely on sample metadata instead of pixels."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # These statistics do not need a GPU device.
+        self.device = torch.device("cpu")
+
+    def preprocess(self, image_batch):
+        raise NotImplementedError("PathBasedStatistic does not process image batches.")
+
+    def lookup(self, paths: Iterable[str]) -> List[float]:
+        """Return the statistic for each input path."""
+        raise NotImplementedError
+
+    def create_histogram(self, data_loader):
+        results: Dict[str, float] = {}
+
+        for _, _, paths in tqdm(data_loader, desc="Generating histograms", leave=False):
+            scores = self.lookup(paths)
+            for path, score in zip(paths, scores):
+                results[path] = float(score)
+
+        return results
+
+
+class LatentNoiseCriterionOriginal(PathBasedStatistic):
+    """Loads pre-computed Latent Noise Criterion scores from disk."""
+
+    def __init__(self, scores_csv: Union[str, Path, None] = None):
+        super().__init__()
+        if scores_csv is None:
+            scores_csv = os.getenv("LATENT_NOISE_CRITERION_ORIGINAL_CSV")
+            if scores_csv is None:
+                raise ValueError(
+                    "Path to the LatentNoiseCriterion_original CSV must be provided via "
+                    "the constructor or the LATENT_NOISE_CRITERION_ORIGINAL_CSV environment variable."
+                )
+
+        self.scores_csv = Path(scores_csv).expanduser().resolve()
+        if not self.scores_csv.exists():
+            raise FileNotFoundError(f"Could not find CSV with scores at {self.scores_csv}")
+
+        self._scores = self._load_scores(self.scores_csv)
+
+    def _load_scores(self, csv_path: Path) -> Dict[str, float]:
+        df = pd.read_csv(csv_path)
+        if "image_path" not in df.columns or "criterion" not in df.columns:
+            raise ValueError(
+                "LatentNoiseCriterion_original CSV must contain 'image_path' and 'criterion' columns."
+            )
+
+        repo_root = Path(__file__).resolve().parents[1]
+        mapping: Dict[str, float] = {}
+
+        for _, row in df.iterrows():
+            image_path = Path(str(row["image_path"])).expanduser()
+            score = float(row["criterion"])
+
+            # Store multiple keys for robust lookup (relative and absolute).
+            candidates = {
+                image_path,
+                repo_root / image_path,
+                (repo_root / image_path).resolve(),
+            }
+
+            for candidate in candidates:
+                mapping[os.path.normpath(str(candidate))] = score
+
+        return mapping
+
+    def lookup(self, paths: Iterable[str]) -> List[float]:
+        scores: List[float] = []
+        repo_root = Path(__file__).resolve().parents[1]
+
+        for path in paths:
+            normalized = os.path.normpath(str(Path(path).expanduser().resolve()))
+            if normalized in self._scores:
+                scores.append(self._scores[normalized])
+                continue
+
+            # Fall back to using the repository-relative path if available.
+            relative = normalized
+            if Path(normalized).is_absolute():
+                try:
+                    relative = os.path.normpath(str(Path(normalized).relative_to(repo_root)))
+                except ValueError:
+                    relative = normalized
+            score = self._scores.get(relative)
+            if score is None:
+                raise KeyError(
+                    f"No pre-computed LatentNoiseCriterion score found for '{path}'."
+                )
+            scores.append(score)
+
+        return scores

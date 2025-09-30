@@ -9,7 +9,7 @@ from processing.histograms import DCTNormHistogram, FourierNormHistogram, Wavele
 from processing.hsv_histogram import HSVHistogram
 from processing.jpeg_histogram import JPEGCompressionRatioHistogram
 from processing.laplacian_histogram import LaplacianVarianceHistogram
-from processing.manifold_bias_histogram import LatentNoiseCriterion
+from processing.manifold_bias_histogram import LatentNoiseCriterion, LatentNoiseCriterionOriginal
 from processing.psnr_noise_histogram import PSNRBlurHistogram
 from processing.rigid_histogram import RIGIDBEiTHistogram, RIGIDBigGCLIPHistogram, RIGIDConvNeXtHistogram, RIGIDDinoV2Histogram, RIGIDDinoV3Histogram, RIGIDEVAHistogram, RIGIDOpenAICLIPHistogram, RIGIDOpenCLIPHistogram, RIGIDResNet50Histogram
 from processing.sift_histogram import SIFTHistogram
@@ -57,6 +57,7 @@ STATISTIC_HISTOGRAMS = {
 
     # Paper Statistics
     'LatentNoiseCriterion': lambda level: LatentNoiseCriterion() if level == 0 else None,
+    'LatentNoiseCriterion_original': lambda level: LatentNoiseCriterionOriginal() if level == 0 else None,
 
     # ==============================
     #    Hardcoded RIGID Statistics
