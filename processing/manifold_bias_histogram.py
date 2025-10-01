@@ -309,53 +309,28 @@ class LatentNoiseCriterionOriginal(PathBasedStatistic):
         self._scores = self._load_scores(self.scores_csv)
 
     def _load_scores(self, csv_path: Path) -> Dict[str, float]:
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(
+            csv_path,
+            usecols=["image_path", "criterion"],
+            dtype={"image_path": str, "criterion": float},
+        )
         if "image_path" not in df.columns or "criterion" not in df.columns:
             raise ValueError(
                 "LatentNoiseCriterion_original CSV must contain 'image_path' and 'criterion' columns."
             )
 
-        repo_root = Path(__file__).resolve().parents[1]
-        mapping: Dict[str, float] = {}
-
-        for _, row in df.iterrows():
-            image_path = Path(str(row["image_path"])).expanduser()
-            score = float(row["criterion"])
-
-            # Store multiple keys for robust lookup (relative and absolute).
-            candidates = {
-                image_path,
-                repo_root / image_path,
-                (repo_root / image_path).resolve(),
-            }
-
-            for candidate in candidates:
-                mapping[os.path.normpath(str(candidate))] = score
-
-        return mapping
+        return dict(zip(df["image_path"], df["criterion"]))
 
     def lookup(self, paths: Iterable[str]) -> List[float]:
         scores: List[float] = []
-        repo_root = Path(__file__).resolve().parents[1]
 
         for path in paths:
-            normalized = os.path.normpath(str(Path(path).expanduser().resolve()))
-            if normalized in self._scores:
-                scores.append(self._scores[normalized])
-                continue
-
-            # Fall back to using the repository-relative path if available.
-            relative = normalized
-            if Path(normalized).is_absolute():
-                try:
-                    relative = os.path.normpath(str(Path(normalized).relative_to(repo_root)))
-                except ValueError:
-                    relative = normalized
-            score = self._scores.get(relative)
+            score = self._scores.get(path)
             if score is None:
                 raise KeyError(
                     f"No pre-computed LatentNoiseCriterion score found for '{path}'."
                 )
+
             scores.append(score)
 
         return scores
