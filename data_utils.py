@@ -168,6 +168,74 @@ class RealStatsDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, self.label, image_path
+
+
+class CrossDomainRealDataset(Dataset):
+    """Dataset class for mixing reference and shifted real domains.
+
+    The CSV is expected to include a ``path`` column and can optionally include a
+    ``dataset_name`` column. When present, ``dataset_name`` is appended between
+    the root directory and the relative path to allow mixing samples from
+    multiple datasets that share a common parent directory.
+    """
+
+    def __init__(
+        self,
+        root_dir,
+        csv_file,
+        label=0,
+        transform=None,
+        dataset_column="dataset_name",
+        path_column="path",
+    ):
+        self.transform = transform
+        self.label = label
+
+        csv_path = os.path.join(root_dir, csv_file)
+        df = pd.read_csv(csv_path)
+
+        self.image_paths = []
+        for _, row in df.iterrows():
+            dataset_name = (
+                str(row[dataset_column])
+                if dataset_column in row and not pd.isna(row[dataset_column])
+                else None
+            )
+            relative_path = str(row[path_column])
+
+            if os.path.isabs(relative_path):
+                image_path = relative_path
+            elif dataset_name:
+                image_path = os.path.join(root_dir, dataset_name, relative_path)
+            else:
+                image_path = os.path.join(root_dir, relative_path)
+
+            self.image_paths.append(image_path)
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        image_path = self.image_paths[idx]
+        image = Image.open(image_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+        return image, self.label, image_path
+
+
+class EmptyDataset(Dataset):
+    """Empty dataset placeholder used when a split is intentionally omitted."""
+
+    def __init__(self, label=1, transform=None):
+        self.label = label
+        self.transform = transform
+        self.image_paths = []
+
+    def __len__(self):
+        return 0
+
+    def __getitem__(self, idx):
+        raise IndexError("EmptyDataset contains no samples")
     
 
 class GlobalPatchDataset(Dataset):

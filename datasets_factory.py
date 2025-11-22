@@ -1,5 +1,12 @@
 from enum import Enum
-from data_utils import CocoDataset, ImageDataset, RealStatsDataset, ProGanDataset
+from data_utils import (
+    CocoDataset,
+    CrossDomainRealDataset,
+    EmptyDataset,
+    ImageDataset,
+    RealStatsDataset,
+    ProGanDataset,
+)
 
 
 class RealStatsGenerators(Enum):
@@ -29,6 +36,7 @@ class RealStatsGenerators(Enum):
     UNIVERSAL_FAKE_DETECT_DALLE = "Universal_Fake_Detect/diffusion_datasets/dalle"
     UNIVERSAL_FAKE_DETECT_GLIDE_100_27 = "Universal_Fake_Detect/diffusion_datasets/glide_100_27"
     UNIVERSAL_FAKE_DETECT_GLIDE_50_27 = "Universal_Fake_Detect/diffusion_datasets/glide_50_27"
+    CELEBA = "CelebA"
 
 
 def _dataset_entry(generator=None):
@@ -53,9 +61,38 @@ def _dataset_entry(generator=None):
         },
     }
 
+
+def _cross_domain_real_only_entry(test_csv, dataset_name):
+    test_root = f"data/{dataset_name}"
+    return {
+        "reference_real": {
+            "path": "data/RealStatsDataset",
+            "class": lambda root, label, transform=None: RealStatsDataset(
+                root, "reference_real_paths.csv", label, transform
+            ),
+        },
+        "test_real": {
+            "path": test_root,
+            "class": lambda root, label, transform=None: CrossDomainRealDataset(
+                root, test_csv, label, transform
+            ),
+        },
+        "test_fake": {
+            "path": test_root,
+            "class": lambda root, label, transform=None: EmptyDataset(
+                label=label, transform=transform
+            ),
+        },
+    }
+
 class DatasetType(Enum):
     # === Base dataset ===
     ALL = _dataset_entry()
+
+    # === Cross-domain real-only experiment ===
+    CELEBA_REAL_ONLY = _cross_domain_real_only_entry(
+        "celeba_real_paths.csv", RealStatsGenerators.CELEBA.value
+    )
 
     # ===  CNNSpot_test ===
     CNNSPOT_BIGGAN = _dataset_entry(RealStatsGenerators.CNNSPOT_BIGGAN.value)
