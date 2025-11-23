@@ -370,9 +370,11 @@ def load_population_histograms(file_path):
 def calculate_metrics(test_labels, predictions):
     """
     Calculate evaluation metrics including precision, recall, specificity, F1-score, and accuracy.
+    
+    Compatible with datasets that only contain a single class (e.g., only real samples).
     """
     # Confusion matrix components
-    cm = confusion_matrix(test_labels, predictions)
+    cm = confusion_matrix(test_labels, predictions, labels=[0, 1])
     tn, fp, fn, tp = cm.ravel()
 
     # Metrics
@@ -405,14 +407,24 @@ def plot_pvalue_histograms(
     label_fontsize=12,
     legend_fontsize=10
 ):
-    """Plot histograms for real and fake p-values with transparency and save to a file."""
+    """Plot histograms for real and fake p-values with transparency and save to a file.
+
+    If ``fake_pvalues`` is empty or ``None``, only the real histogram is drawn.
+    """
     plt.figure(figsize=figsize)
     plt.hist(real_pvalues, bins=bins, alpha=0.6, label="Real", color='tab:blue', density=True)
-    plt.hist(fake_pvalues, bins=bins, alpha=0.6, label="Fake", color='tab:orange', density=True)
+
+    fake_available = fake_pvalues is not None and len(fake_pvalues) > 0
+    if fake_available:
+        plt.hist(fake_pvalues, bins=bins, alpha=0.6, label="Fake", color='tab:orange', density=True)
+
     plt.xlabel(xlabel, fontsize=label_fontsize)
     plt.ylabel(ylabel, fontsize=label_fontsize)
     plt.title(title, fontsize=title_fontsize)
-    plt.legend(fontsize=legend_fontsize)
+
+    if fake_available:
+        plt.legend(fontsize=legend_fontsize)
+
     plt.tight_layout()
     plt.savefig(figname)
     plt.close()
@@ -637,21 +649,26 @@ def compute_mean_std_dict(input_dict):
 
 
 def plot_pvalue_histograms_from_arrays(
-    real_pvals_array, 
-    inference_pvals_array, 
+    real_pvals_array,
+    inference_pvals_array,
     artifact_path,
     keys
 ):
     """
-    Plots p-value histograms for each test using plot_pvalue_histograms."
+    Plots p-value histograms for each test using plot_pvalue_histograms.
+
+    Supports scenarios where only real samples are available (no fake/inference p-values).
     """
 
     _, T = real_pvals_array.shape
-    assert inference_pvals_array.shape[-1] ==  T, "Input arrays must have the same shape"
+    if inference_pvals_array is not None and inference_pvals_array.size > 0:
+        assert inference_pvals_array.shape[-1] ==  T, "Input arrays must have the same shape"
+    else:
+        inference_pvals_array = None
 
     for t in range(T):
         real_pvals = real_pvals_array[:, t]
-        inf_pvals = inference_pvals_array[:, t]
+        inf_pvals = None if inference_pvals_array is None else inference_pvals_array[:, t]
         corrected_name = keys[t].replace(" ", "_").replace(".", "_").replace("=", "-")
         output_file = f"{artifact_path}_test_{corrected_name}"
 
