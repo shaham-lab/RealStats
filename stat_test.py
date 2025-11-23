@@ -203,7 +203,7 @@ def patch_parallel_preprocess(original_dataset, batch_size, combinations, max_wo
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         future_to_combination = {
-            executor.submit(preprocess_statistic, SelfPatchDataset(original_dataset, comb['patch_size']), batch_size, comb['statistic'], num_data_workers, comb['patch_size'], pkl_dir, data_type, seed, cache_suffix): comb
+            executor.submit(preprocess_statistic, SelfPatchDataset(original_dataset, comb['patch_size']), batch_size, comb['statistic'], num_data_workers, comb['patch_size'], pkl_dir, seed, cache_suffix): comb
             for comb in combinations
         }
 
