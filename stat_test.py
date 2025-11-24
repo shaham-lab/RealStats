@@ -217,7 +217,7 @@ def compute_ks_pvalues(keys, pvalue_distributions, sample_size=1_000, seed=None)
         indices = rng.choice(distribution.size, size=sample_count, replace=False)
         sampled_distribution = distribution[indices]
 
-        _, pvalue = kstest(sampled_distribution, "uniform")
+        _, pvalue = kstest(sampled_distribution, 'uniform', args=(0, 1))
         ks_pvalues[key] = float(pvalue)
 
     return ks_pvalues
@@ -349,9 +349,11 @@ def main_multiple_patch_test(
     ks_pvalues = compute_ks_pvalues(
         independent_keys_group,
         independent_tests_pvalues.T,
-        sample_size=1_000,
+        sample_size=500,
         seed=seed,
     )
+
+    ks_pvalues = {k.replace("=", "_"): v for k, v in ks_pvalues.items()}
 
     ensembled_stats, ensembled_pvalues = perform_ensemble_testing(independent_tests_pvalues, ensemble_test)
     predictions = [1 if pval < threshold else 0 for pval in ensembled_pvalues]
@@ -475,9 +477,11 @@ def inference_multiple_patch_test(
     ks_pvalues = compute_ks_pvalues(
         independent_statistics_keys_group,
         independent_tests_pvalues.T,
-        sample_size=1_000,
+        sample_size=500,
         seed=seed,
     )
+
+    ks_pvalues = {k.replace("=", "_"): v for k, v in ks_pvalues.items()}
 
     ensembled_stats, ensembled_pvalues = perform_ensemble_testing(independent_tests_pvalues, ensemble_test)
     predictions = [1 if pval < threshold else 0 for pval in ensembled_pvalues]

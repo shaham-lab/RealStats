@@ -74,6 +74,7 @@ def _cross_domain_real_only_entry(test_csv):
                 # root, "real_paths_distributional_shift_per5.csv", label, transform
                 # root, "real_paths_distributional_shift_per10.csv", label, transform
                 # root, "real_paths_distributional_shift_per20.csv", label, transform
+                # root, "real_paths_distributional_shift_per30.csv", label, transform
                 root, "reference_real_paths_no_faces_or_persons.csv", label, transform
             ),
         },
