@@ -17,6 +17,7 @@ from PIL import Image
 import json
 import sys
 import csv
+import pandas as pd
 
 
 def view_subgraph(subgraph, title="Subgraph Visualization", save_path='subgraph.png'):
@@ -776,6 +777,61 @@ def plot_fakeness_score_histogram(results, test_id, output_dir, threshold=0.5):
 
     print(f"[INFO] Classifier score histogram saved to: {plot_path}")
     return plot_path
+
+
+def export_score_bins_table(scores, labels, test_id, output_dir, bins=10, logger=None):
+    """
+    Export a CSV table summarizing bin counts and percentages for real and fake scores.
+
+    Args:
+        scores (array-like): Final ensemble scores between 0 and 1.
+        labels (array-like): Corresponding labels (0 = real, 1 = fake).
+        test_id (str): Identifier used in the output filename.
+        output_dir (str): Directory to save the CSV file.
+        bins (int, optional): Number of equally spaced bins over [0, 1]. Defaults to 10.
+        logger (optional): Logger with a ``log_artifact`` method (e.g., ``mlflow``) to track the CSV file.
+
+    Returns:
+        str: Path to the saved CSV file.
+    """
+    scores = np.asarray(scores)
+    labels = np.asarray(labels)
+
+    bin_edges = np.linspace(0, 1, bins + 1)
+    bin_labels = [f"{bin_edges[i]:.2f}-{bin_edges[i + 1]:.2f}" for i in range(bins)]
+
+    real_scores = scores[labels == 0]
+    fake_scores = scores[labels == 1]
+
+    real_counts, _ = np.histogram(real_scores, bins=bin_edges)
+    fake_counts, _ = np.histogram(fake_scores, bins=bin_edges)
+
+    def to_percent(counts):
+        total = counts.sum()
+        return np.zeros_like(counts, dtype=float) if total == 0 else counts / total * 100
+
+    real_percentages = to_percent(real_counts)
+    fake_percentages = to_percent(fake_counts)
+
+    df = pd.DataFrame(
+        {
+            "Bin": bin_labels,
+            "Real_Count": real_counts,
+            "Real_Percent": np.round(real_percentages, 2),
+            "Fake_Count": fake_counts,
+            "Fake_Percent": np.round(fake_percentages, 2),
+        }
+    )
+
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"{test_id}_score_bins.csv")
+    df.to_csv(output_path, index=False)
+
+    if logger and hasattr(logger, "log_artifact"):
+        logger.log_artifact(output_path)
+
+    print(f"[INFO] Score bin table saved to: {output_path}")
+    return output_path
 
 
 def plot_kde_with_image_markers(pvals_real, image_pvals, image_labels, figsize=(6, 6), bw=0.2):

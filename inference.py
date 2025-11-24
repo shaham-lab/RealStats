@@ -17,6 +17,7 @@ from utils import (
     plot_fakeness_score_histogram,
     plot_roc_curve,
     set_seed,
+    export_score_bins_table,
 )
 from utils.transform_cache import build_transform_cache_suffix
 from torchvision.utils import save_image
@@ -139,6 +140,7 @@ def main():
         auc = plot_roc_curve(balance_labels, balance_scores, test_id, args.output_dir)
         ap = average_precision_score(balance_labels, balance_scores)
         plot_fakeness_score_histogram(results, test_id, args.output_dir, args.threshold)
+        export_score_bins_table(results['scores'], results['labels'], test_id, args.output_dir, logger=mlflow)
         mlflow.log_metric("AUC", auc)
         mlflow.log_metric("AP", ap)
 
