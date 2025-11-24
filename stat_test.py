@@ -29,6 +29,7 @@ from utils import (
 )
 from data_utils import GlobalPatchDataset, SelfPatchDataset
 from enum import Enum
+from scipy.stats import kstest
 import traceback
 import gc
 
@@ -197,6 +198,31 @@ def interpret_keys_to_combinations(independent_keys_group):
     return combinations
 
 
+def compute_ks_pvalues(keys, pvalue_distributions, sample_size=1_000, seed=None):
+    """Compute KS p-values for each statistic distribution.
+
+    The distributions are subsampled uniformly (without replacement) to avoid
+    unstable values caused by extremely low p-values.
+    """
+
+    ks_pvalues = {}
+    rng = np.random.default_rng(seed)
+
+    for key, distribution in zip(keys, pvalue_distributions):
+        distribution = np.asarray(distribution)
+        if distribution.size == 0:
+            continue
+
+        sample_count = min(sample_size, distribution.size)
+        indices = rng.choice(distribution.size, size=sample_count, replace=False)
+        sampled_distribution = distribution[indices]
+
+        _, pvalue = kstest(sampled_distribution, "uniform")
+        ks_pvalues[key] = float(pvalue)
+
+    return ks_pvalues
+
+
 def patch_parallel_preprocess(original_dataset, batch_size, combinations, max_workers, num_data_workers, pkl_dir='pkls', sort=True, seed=42, cache_suffix=""):
     """Preprocess the dataset for specific combinations in parallel."""
     results = {}
@@ -319,9 +345,21 @@ def main_multiple_patch_test(
     input_samples_pvalues = calculate_pvals_from_cdf(reference_cdfs, inference_histogram, test_type)
     independent_tests_pvalues = np.array(input_samples_pvalues)
     independent_tests_pvalues = np.clip(independent_tests_pvalues, 0, 1)
-        
+
+    ks_pvalues = compute_ks_pvalues(
+        independent_keys_group,
+        independent_tests_pvalues.T,
+        sample_size=1_000,
+        seed=seed,
+    )
+
     ensembled_stats, ensembled_pvalues = perform_ensemble_testing(independent_tests_pvalues, ensemble_test)
     predictions = [1 if pval < threshold else 0 for pval in ensembled_pvalues]
+
+    if logger:
+        logger.log_dict({"ensembled_pvalues": [float(p) for p in ensembled_pvalues]}, "ensembled_pvalues.json")
+        logger.log_metrics(ks_pvalues)
+        logger.log_dict(ks_pvalues, "ks_pvalues_per_stat.json")
 
     plot_pvalue_histograms_from_arrays(
         np.array([p for p, l in zip(independent_tests_pvalues, test_labels) if l == 0]),
@@ -410,7 +448,7 @@ def inference_multiple_patch_test(
 
     keys = list(real_population_histogram.keys())
     tuning_pvalue_distributions = tuning_real_population_pvals.T
-        
+
     if logger:
         logger.log_param("num_tests", len(real_population_histogram.keys()))
         logger.log_param("Independent keys", independent_statistics_keys_group)
@@ -433,9 +471,21 @@ def inference_multiple_patch_test(
     input_samples_pvalues = calculate_pvals_from_cdf(real_population_cdfs, inference_histogram, test_type)
     independent_tests_pvalues = np.array(input_samples_pvalues)
     independent_tests_pvalues = np.clip(independent_tests_pvalues, 0, 1)
-    
+
+    ks_pvalues = compute_ks_pvalues(
+        independent_statistics_keys_group,
+        independent_tests_pvalues.T,
+        sample_size=1_000,
+        seed=seed,
+    )
+
     ensembled_stats, ensembled_pvalues = perform_ensemble_testing(independent_tests_pvalues, ensemble_test)
     predictions = [1 if pval < threshold else 0 for pval in ensembled_pvalues]
+
+    if logger:
+        logger.log_dict({"ensembled_pvalues": [float(p) for p in ensembled_pvalues]}, "ensembled_pvalues.json")
+        logger.log_metrics(ks_pvalues)
+        logger.log_dict(ks_pvalues, "ks_pvalues_per_stat.json")
     
     if test_labels and hasattr(inference_dataset, "image_paths") and draw_pvalues_trend_figure:
         combined = list(zip(inference_dataset.image_paths, ensembled_pvalues, test_labels))
