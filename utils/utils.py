@@ -676,7 +676,8 @@ def plot_pvalue_histograms_from_arrays(
             real_pvals,
             inf_pvals,
             output_file,
-            title=f"Histogram of P-values - Test {corrected_name}"
+            title=f"Histogram of P-values - Test {corrected_name}",
+            bins=40
         )
 
 def build_backbones_statistics_list(models, noise_levels, prefix="RIGID"):

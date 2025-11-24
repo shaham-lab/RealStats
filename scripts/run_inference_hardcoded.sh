@@ -16,7 +16,7 @@ mkdir -p "$LOGS_DIR"
         --ensemble_test "manual-stouffer" \
         --batch_size 16 \
         --output_dir "$LOGS_DIR" \
-        --num_data_workers 2 \
+        --num_data_workers 6 \
         --max_workers 2 \
         --experiment_id "ecdf_robustness" \
         --gpu "0" \
@@ -24,7 +24,7 @@ mkdir -p "$LOGS_DIR"
             PatchProcessing_statistic=RIGID.DINO.05_patch_size=512_seed=38 \
             PatchProcessing_statistic=RIGID.CLIPOPENAI.05_patch_size=512_seed=38 \
         --patch_divisors 0 \
-        --cdf_bins 400 \
+        --cdf_bins 1000 \
         --dataset_type CELEBA_REAL_ONLY \
         --seed 38 \
         --sample_size 512 \

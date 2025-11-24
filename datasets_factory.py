@@ -51,6 +51,7 @@ def _dataset_entry(generator=None):
             "path": "data/RealStatsDataset",
             "class": lambda root, label, transform=None: RealStatsDataset(
                 root, "test_real_paths.csv", label, transform
+                # root, "celeba_real_paths.csv", label, transform
             ),
         },
         "test_fake": {
@@ -67,7 +68,13 @@ def _cross_domain_real_only_entry(test_csv):
         "reference_real": {
             "path": "data/RealStatsDataset",
             "class": lambda root, label, transform=None: RealStatsDataset(
-                root, "reference_real_paths.csv", label, transform
+                # root, "reference_real_paths.csv", label, transform
+                # root, "all_real_paths.csv", label, transform
+                # root, "real_paths_distributional_shift_per1.csv", label, transform
+                # root, "real_paths_distributional_shift_per5.csv", label, transform
+                # root, "real_paths_distributional_shift_per10.csv", label, transform
+                # root, "real_paths_distributional_shift_per20.csv", label, transform
+                root, "reference_real_paths_no_faces_or_persons.csv", label, transform
             ),
         },
         "test_real": {

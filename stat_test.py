@@ -341,7 +341,8 @@ def main_multiple_patch_test(
     if return_logits:
         return {
             'scores': 1 - np.array(ensembled_pvalues),
-            'n_tests': len(list(independent_keys_group))
+            'n_tests': len(list(independent_keys_group)),
+            'labels': test_labels
         }
 
     # Evaluate predictions
@@ -467,14 +468,15 @@ def inference_multiple_patch_test(
             [p for p, l in zip(ensembled_pvalues, test_labels) if l == 1],
             os.path.join(output_dir, f"histogram_plot_{ensemble_test}_alpha_{threshold}.png"),
             "Histogram of P-values", 
-            bins=50,
+            bins=40,
             figsize=(6, 6), title_fontsize=16, label_fontsize=14, legend_fontsize=12
         )
     
     if return_logits:
         return {
             'scores': 1 - np.array(ensembled_pvalues),
-            'n_tests': len(list(independent_statistics_keys_group))
+            'n_tests': len(list(independent_statistics_keys_group)),
+            'labels': test_labels
         }
 
     # Evaluate predictions
