@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pickle
 import random
 import warnings
+import time
 from matplotlib import pyplot as plt
 from scipy.stats import spearmanr
 import torch
@@ -161,13 +162,22 @@ def plot_contingency_table(contingency_table, save_path=None):
         print(f"Plot saved to {save_path}")
 
 
-def compute_chi2_and_corr_matrix(keys, distributions, max_workers=128, plot_independence_heatmap=False, output_dir='logs', bins=10):
+def compute_chi2_and_corr_matrix(
+        keys,
+        distributions,
+        max_workers=128,
+        plot_independence_heatmap=False,
+        output_dir='logs',
+        bins=10,
+        logger=None,
+):
     """Compute Chi-Square p-value matrix and correlation matrix."""
     num_dists = len(distributions)
     chi2_p_matrix = np.zeros((num_dists, num_dists))
     corr_matrix = np.zeros((num_dists, num_dists))
 
     tasks = []
+    start_time = time.perf_counter()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for i, key1 in enumerate(keys):
             dist_1 = distributions[i]
@@ -186,6 +196,10 @@ def compute_chi2_and_corr_matrix(keys, distributions, max_workers=128, plot_inde
             if chi2_p is not None:
                 corr_matrix[i, j] = corr
                 corr_matrix[j, i] = corr  # Symmetry
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    if logger:
+        logger.log_metric("cremer_v_pairwise_ms", elapsed_ms)
 
     if plot_independence_heatmap:
         create_heatmap(chi2_p_matrix, keys, 'Chi-Square Test (P-values)', output_dir, 'chi2_heatmap.png', annot=len(keys) < 64)
@@ -222,10 +236,11 @@ def find_largest_independent_group(keys, chi2_p_matrix, p_threshold=0.05, test_t
     return list(independent_set) if independent_set else [keys[0]]
 
 
-def find_largest_independent_group_iterative(keys, p_matrix, p_threshold=0.05, test_type="chi2"):
+def find_largest_independent_group_iterative(keys, p_matrix, p_threshold=0.05, test_type="chi2", logger=None):
     """
     Find the largest independent groups using a p-value matrix.
     """
+    start_time = time.perf_counter()
     G = nx.Graph()
     G.add_nodes_from(keys)
 
@@ -250,7 +265,47 @@ def find_largest_independent_group_iterative(keys, p_matrix, p_threshold=0.05, t
     # Find all maximal cliques
     cliques = list(nx.find_cliques(subgraph))
 
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    if logger:
+        logger.log_metric("independence_graph_and_cliques_ms", elapsed_ms)
+
     return cliques
+
+
+def synthesize_dense_statistics(
+        num_statistics,
+        vector_length,
+        *,
+        correlation_strength=0.9,
+        noise_scale=0.05,
+        seed=None,
+):
+    """Generate correlated statistic vectors to simulate a dense dependency graph.
+
+    Args:
+        num_statistics: Number of synthetic statistics to generate.
+        vector_length: Length of each statistic vector.
+        correlation_strength: Scaling factor applied to the shared base signal to
+            control dependency density.
+        noise_scale: Standard deviation of the additive noise per statistic.
+        seed: Optional random seed for reproducibility.
+
+    Returns:
+        Tuple[List[str], List[np.ndarray]]: Keys and statistic vectors in [0, 1].
+    """
+    rng = np.random.default_rng(seed)
+    base_signal = rng.standard_normal(vector_length)
+
+    keys = []
+    distributions = []
+    for idx in range(num_statistics):
+        weight = correlation_strength + rng.normal(scale=0.05)
+        noise = rng.normal(scale=noise_scale, size=vector_length)
+        values = norm.cdf(weight * base_signal + noise)
+        distributions.append(np.clip(values, 0.0, 1.0))
+        keys.append(f"synthetic_stat_{idx}")
+
+    return keys, distributions
 
 
 def create_heatmap(data, keys, title, output_dir, filename, figsize=(50, 25), annot=True):
@@ -1327,7 +1382,7 @@ def get_total_size_in_MB(obj):
 
 def finding_optimal_independent_subgroup_deterministic(
     keys, chi2_p_matrix, pvals_matrix, ensemble_test,
-    ks_pvalue_abs_threshold=0.25, minimal_p_threshold=0.05, preferred_statistics=None):
+    ks_pvalue_abs_threshold=0.25, minimal_p_threshold=0.05, preferred_statistics=None, logger=None):
     """Deterministic search over cliques based on KS range and AUC, favoring preferred statistics."""
 
     preferred_lookup = {
@@ -1339,7 +1394,7 @@ def finding_optimal_independent_subgroup_deterministic(
     optimization_data = {'thresholds': [], 'ks_pvalues': [], 'num_tests': []}
     candidates = []
     cliques = find_largest_independent_group_iterative(
-        keys, chi2_p_matrix, p_threshold=minimal_p_threshold, test_type="cramer_v")
+        keys, chi2_p_matrix, p_threshold=minimal_p_threshold, test_type="cramer_v", logger=logger)
     for clique in tqdm(cliques, total=len(cliques), desc="Searching for optimial clique..."):
         independent_keys_group = list(clique)
         num_independent_tests = len(independent_keys_group)

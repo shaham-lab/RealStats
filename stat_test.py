@@ -304,7 +304,8 @@ def main_multiple_patch_test(
     # Chi-Square and Correlation Matrix Computation
     chi2_p_matrix, corr_matrix = compute_chi2_and_corr_matrix(
         keys, tuning_pvalue_distributions, max_workers=max_workers,
-        plot_independence_heatmap=save_independence_heatmaps, output_dir=output_dir, bins=chi2_bins
+        plot_independence_heatmap=save_independence_heatmaps, output_dir=output_dir, bins=chi2_bins,
+        logger=logger,
     )
 
     independent_keys_group, best_results, optimization_roc = finding_optimal_independent_subgroup_deterministic(
@@ -314,7 +315,8 @@ def main_multiple_patch_test(
         ensemble_test=ensemble_test,
         ks_pvalue_abs_threshold=ks_pvalue_abs_threshold,
         minimal_p_threshold=minimal_p_threshold,
-        preferred_statistics=preferred_statistics
+        preferred_statistics=preferred_statistics,
+        logger=logger,
     )
 
     if logger:
