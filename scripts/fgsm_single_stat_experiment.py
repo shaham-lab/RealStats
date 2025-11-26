@@ -8,12 +8,15 @@ from typing import List
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torch.multiprocessing as mp
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.utils import save_image
 
 # Ensure the repository root is importable when executed as a script from scripts/
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+mp.set_start_method("spawn", force=True)
 
 from datasets_factory import DatasetFactory, DatasetType
 from processing.rigid_histogram import RIGIDCLSHistogram, RIGIDNormHistogram
