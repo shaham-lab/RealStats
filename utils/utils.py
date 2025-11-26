@@ -273,26 +273,13 @@ def find_largest_independent_group_iterative(keys, p_matrix, p_threshold=0.05, t
 
 
 def synthesize_dense_statistics(
-        num_statistics,
-        vector_length,
-        *,
-        correlation_strength=0.9,
-        noise_scale=0.05,
-        seed=None,
+    num_statistics,
+    vector_length,
+    *,
+    correlation_strength=0.9,
+    noise_scale=0.05,
+    seed=None,
 ):
-    """Generate correlated statistic vectors to simulate a dense dependency graph.
-
-    Args:
-        num_statistics: Number of synthetic statistics to generate.
-        vector_length: Length of each statistic vector.
-        correlation_strength: Scaling factor applied to the shared base signal to
-            control dependency density.
-        noise_scale: Standard deviation of the additive noise per statistic.
-        seed: Optional random seed for reproducibility.
-
-    Returns:
-        Tuple[List[str], List[np.ndarray]]: Keys and statistic vectors in [0, 1].
-    """
     rng = np.random.default_rng(seed)
     base_signal = rng.standard_normal(vector_length)
 
@@ -301,9 +288,13 @@ def synthesize_dense_statistics(
     for idx in range(num_statistics):
         weight = correlation_strength + rng.normal(scale=0.05)
         noise = rng.normal(scale=noise_scale, size=vector_length)
-        values = norm.cdf(weight * base_signal + noise)
-        distributions.append(np.clip(values, 0.0, 1.0))
+
+        values = weight * base_signal + noise
+        # Stretch to [0,1]
+        values = (values - values.min()) / (values.max() - values.min())
+
         keys.append(f"synthetic_stat_{idx}")
+        distributions.append(values)
 
     return keys, distributions
 
