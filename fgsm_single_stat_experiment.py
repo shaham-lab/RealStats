@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional
 
 import numpy as np
@@ -98,12 +99,15 @@ def evaluate_single_image_pvalue(
     transform: transforms.Compose,
     cache_suffix: str = "",
     cache_dir: Optional[str] = None,
+    image_name: Optional[str] = None,
 ) -> tuple[float, float]:
     combinations = interpret_keys_to_combinations(independent_keys)
     cache_root = cache_dir or os.path.join(pkl_dir, "fgsm_tmp")
     os.makedirs(cache_root, exist_ok=True)
 
-    primary_path = os.path.join(cache_root, f"sample_primary_{cache_suffix or 'orig'}.png")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    primary_filename = image_name or f"sample_primary_{cache_suffix or 'orig'}_{timestamp}.png"
+    primary_path = os.path.join(cache_root, primary_filename)
 
     save_image(primary_image, primary_path)
 
@@ -248,7 +252,12 @@ def run_attack_experiment(args) -> AttackResult:
     while fake_image.dim() > 3:
         fake_image = fake_image.squeeze(0)
     os.makedirs(args.output_dir, exist_ok=True)
-    save_image(fake_image, os.path.join(args.output_dir, "original_fake.png"))
+
+    baseline_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    baseline_filename = f"baseline_fake_{baseline_timestamp}.png"
+    attacked_filename = f"attacked_fake_{baseline_timestamp}.png"
+
+    save_image(fake_image, os.path.join(args.output_dir, baseline_filename))
 
     baseline_pvalue, baseline_statistic = evaluate_single_image_pvalue(
         fake_image,
@@ -263,6 +272,7 @@ def run_attack_experiment(args) -> AttackResult:
         transform=transform,
         cache_suffix=f"baseline_{args.cache_suffix}",
         cache_dir=args.output_dir,
+        image_name=f"baseline_eval_{baseline_timestamp}.png",
     )
 
     histogram_generator = get_histogram_generator(args.statistic)
@@ -277,7 +287,7 @@ def run_attack_experiment(args) -> AttackResult:
         args.iterations,
         step_size=args.step_size,
     )
-    save_image(attacked_image, os.path.join(args.output_dir, "attacked_fake.png"))
+    save_image(attacked_image, os.path.join(args.output_dir, attacked_filename))
 
     attacked_pvalue, attacked_statistic = evaluate_single_image_pvalue(
         attacked_image,
@@ -292,6 +302,7 @@ def run_attack_experiment(args) -> AttackResult:
         transform=transform,
         cache_suffix=f"attacked_{args.cache_suffix}",
         cache_dir=args.output_dir,
+        image_name=f"attacked_eval_{baseline_timestamp}.png",
     )
 
     result = AttackResult(
