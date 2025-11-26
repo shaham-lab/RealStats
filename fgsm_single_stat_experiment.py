@@ -1,3 +1,5 @@
+"""FGSM attack experiment script (single fake sample) at the repository root."""
+
 import argparse
 import json
 import os
@@ -271,7 +273,7 @@ def run_attack_experiment(args) -> AttackResult:
     print(f"  Attacked statistic value: {attacked_statistic:.6f}")
     print(f"  Baseline p-value: {baseline_pvalue:.6f}")
     print(f"  Attacked p-value: {attacked_pvalue:.6f}")
-    print(f"  Primary fake sample path: {image_path}")
+    print(f"  Fake sample path: {image_path}")
 
     return result
 
