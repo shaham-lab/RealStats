@@ -141,22 +141,11 @@ def evaluate_single_image_pvalue(
 # --- FGSM helpers ---------------------------------------------------------
 
 
-def _forward_statistic(
+def _forward_statistic_from_pixels(
     histogram_generator: RIGIDCLSHistogram,
-    image_batch: torch.Tensor,
+    pixel_values: torch.Tensor,
 ):
-    """Run the RIGID statistic forward pass with gradients enabled."""
-
-    # The processor expects a 4D BCHW tensor; squeeze or unsqueeze to normalize shapes.
-    if image_batch.dim() > 4:
-        image_batch = image_batch.squeeze(0)
-    if image_batch.dim() == 3:
-        image_batch = image_batch.unsqueeze(0)
-
-    processor_inputs = histogram_generator.processor(images=image_batch, return_tensors="pt").to(
-        histogram_generator.device
-    )
-    pixel_values = processor_inputs["pixel_values"].requires_grad_(True)
+    """Run the RIGID statistic forward pass on prepared pixel values."""
 
     outputs = histogram_generator.model(**{"pixel_values": pixel_values})
     embedding = histogram_generator.get_embedding(outputs)
@@ -170,7 +159,20 @@ def _forward_statistic(
         noisy_embedding = noisy_embedding[:, 0, :]
 
     similarity = F.cosine_similarity(embedding, noisy_embedding, dim=-1)
-    return similarity.mean(), pixel_values
+    return similarity.mean()
+
+
+def _denormalize_pixel_values(histogram_generator: RIGIDCLSHistogram, pixel_values: torch.Tensor) -> torch.Tensor:
+    """Convert processor-normalized pixel values back to image space for saving/evaluation."""
+
+    mean = torch.tensor(
+        histogram_generator.processor.image_mean, device=pixel_values.device, dtype=pixel_values.dtype
+    ).view(1, -1, 1, 1)
+    std = torch.tensor(
+        histogram_generator.processor.image_std, device=pixel_values.device, dtype=pixel_values.dtype
+    ).view(1, -1, 1, 1)
+    images = pixel_values * std + mean
+    return torch.clamp(images, 0, 1)
 
 
 def iterative_fgsm_attack_statistic(
@@ -179,23 +181,40 @@ def iterative_fgsm_attack_statistic(
     epsilon: float,
     target_value: float,
     iterations: int,
+    step_size: Optional[float] = None,
 ) -> torch.Tensor:
     """Iteratively apply FGSM steps to drive the statistic toward the target value."""
 
-    adv_image = image.detach().clone().to(histogram_generator.device)
+    if image.dim() == 4:
+        image = image.squeeze(0)
 
-    for _ in range(max(1, iterations)):
-        image_batch = adv_image.unsqueeze(0)
+    base_pixels = histogram_generator.processor(images=image.unsqueeze(0), return_tensors="pt").to(
+        histogram_generator.device
+    )["pixel_values"].detach()
+
+    adv_pixels = base_pixels.clone()
+    total_steps = max(1, iterations)
+    step = step_size if step_size is not None else epsilon / total_steps
+
+    lower_bound = torch.clamp(base_pixels - epsilon, 0, 1)
+    upper_bound = torch.clamp(base_pixels + epsilon, 0, 1)
+
+    for _ in range(total_steps):
+        adv_pixels = adv_pixels.clone().detach().requires_grad_(True)
         histogram_generator.model.zero_grad(set_to_none=True)
-        stat_value, pixel_values = _forward_statistic(histogram_generator, image_batch)
+
+        stat_value = _forward_statistic_from_pixels(histogram_generator, adv_pixels)
         loss = (stat_value - target_value) ** 2
         loss.backward()
 
         with torch.no_grad():
-            perturbation = epsilon * pixel_values.grad.sign()
-            adv_image = torch.clamp(pixel_values - perturbation, 0, 1).detach()
+            perturbation = step * adv_pixels.grad.sign()
+            adv_pixels = adv_pixels - perturbation
+            adv_pixels = torch.max(torch.min(adv_pixels, upper_bound), lower_bound)
+            adv_pixels = torch.clamp(adv_pixels, 0, 1)
 
-    return adv_image.cpu().squeeze(0)
+    attacked_image = _denormalize_pixel_values(histogram_generator, adv_pixels).cpu().squeeze(0)
+    return attacked_image
 
 
 # --- Main experiment driver ----------------------------------------------
@@ -256,6 +275,7 @@ def run_attack_experiment(args) -> AttackResult:
         args.epsilon,
         reference_mean,
         args.iterations,
+        step_size=args.step_size,
     )
     save_image(attacked_image, os.path.join(args.output_dir, "attacked_fake.png"))
 
@@ -288,6 +308,7 @@ def run_attack_experiment(args) -> AttackResult:
     print("[INFO] FGSM attack completed")
     print(f"  Statistic: {args.statistic}")
     print(f"  Attack iterations: {args.iterations}")
+    print(f"  Step size: {args.step_size or args.epsilon / max(1, args.iterations):.6f}")
     print(f"  Target reference mean: {reference_mean:.6f}")
     print(f"  Baseline statistic value: {baseline_statistic:.6f}")
     print(f"  Attacked statistic value: {attacked_statistic:.6f}")
@@ -303,6 +324,12 @@ if __name__ == "__main__":
     parser.add_argument("--statistic", type=str, default="RIGID.DINO.05", help="Statistic to attack (e.g., RIGID.DINO.05)")
     parser.add_argument("--epsilon", type=float, default=1e-3, help="FGSM step size")
     parser.add_argument("--iterations", type=int, default=5, help="Number of iterative FGSM steps")
+    parser.add_argument(
+        "--step_size",
+        type=float,
+        default=None,
+        help="Optional per-step FGSM step size (defaults to epsilon/iterations)",
+    )
     parser.add_argument("--dataset_type", type=str, default="ALL", choices=[e.name for e in DatasetType], help="Dataset split")
     parser.add_argument("--fake_index", type=int, default=0, help="Index of fake sample to attack")
     parser.add_argument("--sample_size", type=int, default=512, help="Image resize before processing")
