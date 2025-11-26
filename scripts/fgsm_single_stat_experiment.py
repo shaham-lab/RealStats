@@ -127,7 +127,7 @@ def evaluate_single_image_pvalue(
     )
     histogram = compute_mean_std_dict(histogram)
     histogram = {
-        k: np.atleast_1d(np.asarray(v).squeeze())
+        k: np.ravel(np.asarray(v))
         for k, v in histogram.items()
         if k in independent_keys or k.rstrip("_mean") in independent_keys
     }
