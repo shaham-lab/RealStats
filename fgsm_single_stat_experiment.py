@@ -167,24 +167,29 @@ def _forward_statistic(
     return similarity.mean(), pixel_values
 
 
-def fgsm_attack_statistic(
+def iterative_fgsm_attack_statistic(
     histogram_generator: RIGIDCLSHistogram,
     image: torch.Tensor,
     epsilon: float,
     target_value: float,
+    iterations: int,
 ) -> torch.Tensor:
-    """Apply an FGSM step that nudges the statistic toward the target value."""
+    """Iteratively apply FGSM steps to drive the statistic toward the target value."""
 
-    image_batch = image.unsqueeze(0).to(histogram_generator.device)
-    stat_value, pixel_values = _forward_statistic(histogram_generator, image_batch)
-    loss = (stat_value - target_value) ** 2
-    loss.backward()
+    adv_image = image.detach().clone().to(histogram_generator.device)
 
-    with torch.no_grad():
-        perturbation = epsilon * pixel_values.grad.sign()
-        perturbed_pixels = torch.clamp(pixel_values - perturbation, 0, 1)
+    for _ in range(max(1, iterations)):
+        image_batch = adv_image.unsqueeze(0)
+        histogram_generator.model.zero_grad(set_to_none=True)
+        stat_value, pixel_values = _forward_statistic(histogram_generator, image_batch)
+        loss = (stat_value - target_value) ** 2
+        loss.backward()
 
-    return perturbed_pixels.detach().cpu().squeeze(0)
+        with torch.no_grad():
+            perturbation = epsilon * pixel_values.grad.sign()
+            adv_image = torch.clamp(pixel_values - perturbation, 0, 1).detach()
+
+    return adv_image.cpu().squeeze(0)
 
 
 # --- Main experiment driver ----------------------------------------------
@@ -237,7 +242,13 @@ def run_attack_experiment(args) -> AttackResult:
     if not isinstance(histogram_generator, (RIGIDCLSHistogram, RIGIDNormHistogram)):
         raise ValueError("FGSM attack currently supports RIGID-based statistics only.")
 
-    attacked_image = fgsm_attack_statistic(histogram_generator, fake_image, args.epsilon, reference_mean)
+    attacked_image = iterative_fgsm_attack_statistic(
+        histogram_generator,
+        fake_image,
+        args.epsilon,
+        reference_mean,
+        args.iterations,
+    )
     save_image(attacked_image, os.path.join(args.output_dir, "attacked_fake.png"))
 
     attacked_pvalue, attacked_statistic = evaluate_single_image_pvalue(
@@ -268,6 +279,7 @@ def run_attack_experiment(args) -> AttackResult:
 
     print("[INFO] FGSM attack completed")
     print(f"  Statistic: {args.statistic}")
+    print(f"  Attack iterations: {args.iterations}")
     print(f"  Target reference mean: {reference_mean:.6f}")
     print(f"  Baseline statistic value: {baseline_statistic:.6f}")
     print(f"  Attacked statistic value: {attacked_statistic:.6f}")
@@ -282,6 +294,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FGSM attack against a single statistic.")
     parser.add_argument("--statistic", type=str, default="RIGID.DINO.05", help="Statistic to attack (e.g., RIGID.DINO.05)")
     parser.add_argument("--epsilon", type=float, default=1e-3, help="FGSM step size")
+    parser.add_argument("--iterations", type=int, default=5, help="Number of iterative FGSM steps")
     parser.add_argument("--dataset_type", type=str, default="ALL", choices=[e.name for e in DatasetType], help="Dataset split")
     parser.add_argument("--fake_index", type=int, default=0, help="Index of fake sample to attack")
     parser.add_argument("--sample_size", type=int, default=512, help="Image resize before processing")
