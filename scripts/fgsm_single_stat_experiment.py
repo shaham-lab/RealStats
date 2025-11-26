@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import torch
@@ -19,6 +19,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 mp.set_start_method("spawn", force=True)
 
 from datasets_factory import DatasetFactory, DatasetType
+from data_utils import ImageDataset
 from processing.rigid_histogram import RIGIDCLSHistogram, RIGIDNormHistogram
 from statistics_factory import get_histogram_generator
 from stat_test import (
@@ -117,16 +118,24 @@ def evaluate_single_image_pvalue(
     num_data_workers: int,
     pkl_dir: str,
     seed: int,
+    transform: transforms.Compose,
     cache_suffix: str = "",
+    cache_dir: Optional[str] = None,
 ) -> tuple[float, float]:
     combinations = interpret_keys_to_combinations(independent_keys)
-    dataset = TensorBackedDataset(
-        [primary_image, companion_image],
+    cache_root = cache_dir or os.path.join(pkl_dir, "fgsm_tmp")
+    os.makedirs(cache_root, exist_ok=True)
+
+    primary_path = os.path.join(cache_root, f"sample_primary_{cache_suffix or 'orig'}.png")
+    companion_path = os.path.join(cache_root, f"sample_companion_{cache_suffix or 'orig'}.png")
+
+    save_image(primary_image, primary_path)
+    save_image(companion_image, companion_path)
+
+    dataset = ImageDataset(
+        [primary_path, companion_path],
         [primary_label, companion_label],
-        [
-            f"sample_primary_{cache_suffix or 'orig'}.png",
-            f"sample_companion_{cache_suffix or 'orig'}.png",
-        ],
+        transform=transform,
     )
     histogram = patch_parallel_preprocess(
         dataset,
@@ -249,7 +258,9 @@ def run_attack_experiment(args) -> AttackResult:
         num_data_workers=args.num_data_workers,
         pkl_dir=args.pkl_dir,
         seed=args.seed,
+        transform=transform,
         cache_suffix=f"baseline_{args.cache_suffix}",
+        cache_dir=args.output_dir,
     )
 
     histogram_generator = get_histogram_generator(args.statistic)
@@ -271,7 +282,9 @@ def run_attack_experiment(args) -> AttackResult:
         num_data_workers=args.num_data_workers,
         pkl_dir=args.pkl_dir,
         seed=args.seed,
+        transform=transform,
         cache_suffix=f"attacked_{args.cache_suffix}",
+        cache_dir=args.output_dir,
     )
 
     result = AttackResult(
