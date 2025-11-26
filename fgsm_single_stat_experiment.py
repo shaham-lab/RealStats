@@ -147,6 +147,12 @@ def _forward_statistic(
 ):
     """Run the RIGID statistic forward pass with gradients enabled."""
 
+    # The processor expects a 4D BCHW tensor; squeeze or unsqueeze to normalize shapes.
+    if image_batch.dim() > 4:
+        image_batch = image_batch.squeeze(0)
+    if image_batch.dim() == 3:
+        image_batch = image_batch.unsqueeze(0)
+
     processor_inputs = histogram_generator.processor(images=image_batch, return_tensors="pt").to(
         histogram_generator.device
     )
@@ -220,6 +226,8 @@ def run_attack_experiment(args) -> AttackResult:
     reference_mean = float(np.mean(reference_histograms[reference_key]))
 
     fake_image, label, image_path = fake_dataset[args.fake_index]
+    while fake_image.dim() > 3:
+        fake_image = fake_image.squeeze(0)
     os.makedirs(args.output_dir, exist_ok=True)
     save_image(fake_image, os.path.join(args.output_dir, "original_fake.png"))
 
