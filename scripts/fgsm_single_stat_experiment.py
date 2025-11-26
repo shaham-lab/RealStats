@@ -9,7 +9,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
-from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.utils import save_image
 
@@ -42,24 +41,6 @@ class AttackResult:
     baseline_statistic: float
     attacked_statistic: float
     reference_mean: float
-
-
-class TensorBackedDataset(Dataset):
-    """Dataset wrapper that exposes one or more tensor images."""
-
-    def __init__(self, images: List[torch.Tensor], labels: List[int], path_stubs: List[str]):
-        assert len(images) == len(labels) == len(path_stubs), "Images, labels, and paths must align"
-        self.images = images
-        self.labels = labels
-        self.image_paths = path_stubs
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        return self.images[idx], self.labels[idx], self.image_paths[idx]
-
-
 # --- Utility functions -----------------------------------------------------
 
 
