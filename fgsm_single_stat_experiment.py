@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import sys
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -11,9 +10,6 @@ import torch.nn.functional as F
 import torch.multiprocessing as mp
 from torchvision import transforms
 from torchvision.utils import save_image
-
-# Ensure the repository root is importable when executed as a script from scripts/
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 mp.set_start_method("spawn", force=True)
 
@@ -90,8 +86,6 @@ def compute_reference_distributions(
 def evaluate_single_image_pvalue(
     primary_image: torch.Tensor,
     primary_label: int,
-    companion_image: torch.Tensor,
-    companion_label: int,
     independent_keys: List[str],
     reference_cdfs,
     batch_size: int,
@@ -108,14 +102,12 @@ def evaluate_single_image_pvalue(
     os.makedirs(cache_root, exist_ok=True)
 
     primary_path = os.path.join(cache_root, f"sample_primary_{cache_suffix or 'orig'}.png")
-    companion_path = os.path.join(cache_root, f"sample_companion_{cache_suffix or 'orig'}.png")
 
     save_image(primary_image, primary_path)
-    save_image(companion_image, companion_path)
 
     dataset = ImageDataset(
-        [primary_path, companion_path],
-        [primary_label, companion_label],
+        [primary_path],
+        [primary_label],
         transform=transform,
     )
     histogram = patch_parallel_preprocess(
@@ -221,17 +213,12 @@ def run_attack_experiment(args) -> AttackResult:
     reference_mean = float(np.mean(reference_histograms[reference_key]))
 
     fake_image, label, image_path = fake_dataset[args.fake_index]
-    if args.fake_index + 1 >= len(fake_dataset):
-        raise ValueError("Dataset does not contain a second fake sample required for preprocessing.")
-    companion_image, companion_label, companion_path = fake_dataset[args.fake_index + 1]
     os.makedirs(args.output_dir, exist_ok=True)
     save_image(fake_image, os.path.join(args.output_dir, "original_fake.png"))
 
     baseline_pvalue, baseline_statistic = evaluate_single_image_pvalue(
         fake_image,
         label,
-        companion_image,
-        companion_label,
         independent_keys,
         reference_cdfs,
         batch_size=args.batch_size,
@@ -254,8 +241,6 @@ def run_attack_experiment(args) -> AttackResult:
     attacked_pvalue, attacked_statistic = evaluate_single_image_pvalue(
         attacked_image,
         label,
-        companion_image,
-        companion_label,
         independent_keys,
         reference_cdfs,
         batch_size=args.batch_size,
@@ -287,7 +272,6 @@ def run_attack_experiment(args) -> AttackResult:
     print(f"  Baseline p-value: {baseline_pvalue:.6f}")
     print(f"  Attacked p-value: {attacked_pvalue:.6f}")
     print(f"  Primary fake sample path: {image_path}")
-    print(f"  Companion fake sample path: {companion_path}")
 
     return result
 
