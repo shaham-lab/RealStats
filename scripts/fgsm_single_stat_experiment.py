@@ -44,18 +44,19 @@ class AttackResult:
 
 
 class TensorBackedDataset(Dataset):
-    """Minimal dataset wrapper that exposes a single tensor image."""
+    """Dataset wrapper that exposes one or more tensor images."""
 
-    def __init__(self, image: torch.Tensor, label: int, path_stub: str = "image.png"):
-        self.image = image
-        self.label = label
-        self.image_paths = [path_stub]
+    def __init__(self, images: List[torch.Tensor], labels: List[int], path_stubs: List[str]):
+        assert len(images) == len(labels) == len(path_stubs), "Images, labels, and paths must align"
+        self.images = images
+        self.labels = labels
+        self.image_paths = path_stubs
 
     def __len__(self):
-        return 1
+        return len(self.images)
 
     def __getitem__(self, idx):
-        return self.image, self.label, self.image_paths[idx]
+        return self.images[idx], self.labels[idx], self.image_paths[idx]
 
 
 # --- Utility functions -----------------------------------------------------
@@ -105,8 +106,10 @@ def compute_reference_distributions(
 
 
 def evaluate_single_image_pvalue(
-    image: torch.Tensor,
-    label: int,
+    primary_image: torch.Tensor,
+    primary_label: int,
+    companion_image: torch.Tensor,
+    companion_label: int,
     independent_keys: List[str],
     reference_cdfs,
     batch_size: int,
@@ -115,9 +118,16 @@ def evaluate_single_image_pvalue(
     pkl_dir: str,
     seed: int,
     cache_suffix: str = "",
-    ) -> tuple[float, float]:
+) -> tuple[float, float]:
     combinations = interpret_keys_to_combinations(independent_keys)
-    dataset = TensorBackedDataset(image, label, path_stub=f"sample_{cache_suffix or 'orig'}.png")
+    dataset = TensorBackedDataset(
+        [primary_image, companion_image],
+        [primary_label, companion_label],
+        [
+            f"sample_primary_{cache_suffix or 'orig'}.png",
+            f"sample_companion_{cache_suffix or 'orig'}.png",
+        ],
+    )
     histogram = patch_parallel_preprocess(
         dataset,
         batch_size,
@@ -130,7 +140,7 @@ def evaluate_single_image_pvalue(
     )
     histogram = compute_mean_std_dict(histogram)
     histogram = {
-        k: np.ravel(np.asarray(v))
+        k: np.ravel(np.asarray(v)[0] if np.asarray(v).ndim > 0 else np.asarray(v))
         for k, v in histogram.items()
         if k in independent_keys or k.rstrip("_mean") in independent_keys
     }
@@ -221,12 +231,17 @@ def run_attack_experiment(args) -> AttackResult:
     reference_mean = float(np.mean(reference_histograms[reference_key]))
 
     fake_image, label, image_path = fake_dataset[args.fake_index]
+    if args.fake_index + 1 >= len(fake_dataset):
+        raise ValueError("Dataset does not contain a second fake sample required for preprocessing.")
+    companion_image, companion_label, companion_path = fake_dataset[args.fake_index + 1]
     os.makedirs(args.output_dir, exist_ok=True)
     save_image(fake_image, os.path.join(args.output_dir, "original_fake.png"))
 
     baseline_pvalue, baseline_statistic = evaluate_single_image_pvalue(
         fake_image,
         label,
+        companion_image,
+        companion_label,
         independent_keys,
         reference_cdfs,
         batch_size=args.batch_size,
@@ -247,6 +262,8 @@ def run_attack_experiment(args) -> AttackResult:
     attacked_pvalue, attacked_statistic = evaluate_single_image_pvalue(
         attacked_image,
         label,
+        companion_image,
+        companion_label,
         independent_keys,
         reference_cdfs,
         batch_size=args.batch_size,
@@ -275,7 +292,8 @@ def run_attack_experiment(args) -> AttackResult:
     print(f"  Attacked statistic value: {attacked_statistic:.6f}")
     print(f"  Baseline p-value: {baseline_pvalue:.6f}")
     print(f"  Attacked p-value: {attacked_pvalue:.6f}")
-    print(f"  Fake sample path: {image_path}")
+    print(f"  Primary fake sample path: {image_path}")
+    print(f"  Companion fake sample path: {companion_path}")
 
     return result
 
