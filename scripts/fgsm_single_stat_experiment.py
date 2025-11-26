@@ -126,7 +126,11 @@ def evaluate_single_image_pvalue(
         cache_suffix=cache_suffix,
     )
     histogram = compute_mean_std_dict(histogram)
-    histogram = {k: v for k, v in histogram.items() if k in independent_keys or k.rstrip("_mean") in independent_keys}
+    histogram = {
+        k: np.atleast_1d(np.asarray(v).squeeze())
+        for k, v in histogram.items()
+        if k in independent_keys or k.rstrip("_mean") in independent_keys
+    }
     pvalues = calculate_pvals_from_cdf(reference_cdfs, histogram, TestType.BOTH)
     pvalues = np.clip(np.array(pvalues, dtype=np.float32), 0.0, 1.0)
 
