@@ -681,7 +681,7 @@ def compute_mean_std_dict(input_dict):
         array = np.asarray(array)
 
         if array.shape[-1] == 1:
-            output_dict[key] = array.squeeze()
+            output_dict[key] = np.squeeze(array, axis=-1)
             continue
 
         # Compute mean and std along axis 1 (for each row)
