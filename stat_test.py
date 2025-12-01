@@ -1,6 +1,8 @@
 import itertools
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Sequence
 import random
 import re
 import numpy as np
@@ -28,7 +30,18 @@ class TestType(Enum):
     LEFT = "left"
     RIGHT = "right"
     BOTH = "both"
-    
+
+
+@dataclass
+class ReferenceModel:
+    independent_keys: List[str]
+    reference_cdfs: Dict[str, np.ndarray]
+    reference_cache_suffix: str = ""
+
+    @property
+    def independent_combinations(self):
+        return interpret_keys_to_combinations(self.independent_keys)
+
 
 def get_unique_id(patch_size, statistic, seed=42):
     """Generate a unique ID for processing."""
@@ -216,70 +229,79 @@ def patch_parallel_preprocess(original_dataset, batch_size, combinations, max_wo
     return results
 
 
-def main_multiple_patch_test(
+def build_reference_model(
     reference_dataset,
-    inference_dataset,
-    statistics,
-    patch_sizes,
-    batch_size=128,
-    threshold=0.05,
-    ensemble_test='stouffer',
-    max_workers=128,
-    num_data_workers=2,
-    output_dir='logs',
-    pkl_dir='pkls',
-    return_logits=False,
-    chi2_bins=10,
-    cdf_bins=500,
-    ks_pvalue_abs_threshold=0.25,
-    test_type=TestType.LEFT,
-    cremer_v_threshold=0.05,
+    statistics: Sequence[str] | None,
+    patch_sizes: Sequence[int] | None,
+    batch_size: int,
+    max_workers: int,
+    num_data_workers: int,
+    pkl_dir: str,
+    seed: int,
+    cdf_bins: int,
+    ensemble_test: str,
+    chi2_bins: int,
+    ks_pvalue_abs_threshold: float,
+    cremer_v_threshold: float,
+    preferred_statistics: Iterable[str] | None = None,
+    independent_keys: Sequence[str] | None = None,
+    test_type: TestType = TestType.LEFT,
     logger=None,
-    seed=42,
-    preferred_statistics=None
-):
-    """Run test for number of patches and collect sensitivity and specificity results."""
-    print(f"Running test with: \npatches sizes: {patch_sizes}\nstatistics: {statistics}")
+    cache_suffix: str = "",
+) -> ReferenceModel:
+    """Calibrate detectors on the reference set and select independent statistics."""
+    if independent_keys is not None:
+        training_combinations = interpret_keys_to_combinations(independent_keys)
+    else:
+        if statistics is None or patch_sizes is None:
+            raise ValueError("statistics and patch_sizes are required when independent_keys are not provided")
+        training_combinations = generate_combinations(patch_sizes, statistics)
 
-    # Generate all combinations for training
-    training_combinations = generate_combinations(patch_sizes, statistics)
-
-    # Load or compute reference histograms
+    # Stage 1.1: Multi-detector processing across detector configurations.
     reference_histogram = patch_parallel_preprocess(
-        reference_dataset, batch_size, training_combinations, max_workers, num_data_workers, pkl_dir=pkl_dir, seed=seed
+        reference_dataset,
+        batch_size,
+        training_combinations,
+        max_workers,
+        num_data_workers,
+        pkl_dir=pkl_dir,
+        seed=seed,
+        cache_suffix=cache_suffix,
     )
-
     reference_histogram = compute_mean_std_dict(reference_histogram)
     reference_histogram = remove_nans_from_tests(reference_histogram)
 
-    # CDF creation
     # Stage 1.2: Empirical two-sided p-value modeling via ECDFs.
-    reference_cdfs = {test_id: compute_cdf(values, bins=cdf_bins, test_id=test_id) for test_id, values in reference_histogram.items()}
+    reference_cdfs = {
+        test_id: compute_cdf(values, bins=cdf_bins, test_id=test_id)
+        for test_id, values in reference_histogram.items()
+    }
 
-    # Tuning Pvalues
     tuning_reference_pvals = calculate_pvals_from_cdf(reference_cdfs, reference_histogram, test_type)
     tuning_reference_pvals = np.clip(tuning_reference_pvals, 0, 1)
 
     keys = list(reference_histogram.keys())
-
     tuning_pvalue_distributions = tuning_reference_pvals.T
 
-    # Chi-Square and Correlation Matrix Computation
-    # Stage 2.1: Pairwise dependence testing under the null.
-    chi2_p_matrix, corr_matrix = compute_chi2_and_corr_matrix(
-        keys, tuning_pvalue_distributions, max_workers=max_workers, bins=chi2_bins
-    )
+    if independent_keys is not None:
+        independent_keys_group = list(independent_keys)
+        best_results = {}
+    else:
+        # Stage 2.1: Pairwise dependence testing under the null.
+        chi2_p_matrix, _ = compute_chi2_and_corr_matrix(
+            keys, tuning_pvalue_distributions, max_workers=max_workers, bins=chi2_bins
+        )
 
-    # Stage 2.2-2.3: Independence graph construction and maximal clique selection.
-    independent_keys_group, best_results, _ = finding_optimal_independent_subgroup_deterministic(
-        keys=keys,
-        chi2_p_matrix=chi2_p_matrix,
-        pvals_matrix=tuning_pvalue_distributions,
-        ensemble_test=ensemble_test,
-        ks_pvalue_abs_threshold=ks_pvalue_abs_threshold,
-        cremer_v_threshold=cremer_v_threshold,
-        preferred_statistics=preferred_statistics
-    )
+        # Stage 2.2-2.3: Independence graph construction and maximal clique selection.
+        independent_keys_group, best_results, _ = finding_optimal_independent_subgroup_deterministic(
+            keys=keys,
+            chi2_p_matrix=chi2_p_matrix,
+            pvals_matrix=tuning_pvalue_distributions,
+            ensemble_test=ensemble_test,
+            ks_pvalue_abs_threshold=ks_pvalue_abs_threshold,
+            cremer_v_threshold=cremer_v_threshold,
+            preferred_statistics=preferred_statistics,
+        )
 
     if logger:
         logger.log_param("num_tests", len(reference_histogram.keys()))
@@ -288,132 +310,75 @@ def main_multiple_patch_test(
             logger.log_param("preferred_statistics", preferred_statistics)
         logger.log_metrics(best_results)
 
-    # Convert independent keys to combinations
-    independent_combinations = interpret_keys_to_combinations(independent_keys_group)
+    return ReferenceModel(
+        independent_keys=list(independent_keys_group),
+        reference_cdfs=reference_cdfs,
+        reference_cache_suffix=cache_suffix,
+    )
 
+
+def run_inference_with_reference_model(
+    reference_model: ReferenceModel,
+    inference_dataset,
+    batch_size: int,
+    threshold: float,
+    ensemble_test: str,
+    max_workers: int,
+    num_data_workers: int,
+    pkl_dir: str,
+    return_logits: bool,
+    test_type: TestType,
+    seed: int,
+    logger=None,
+    cache_suffix: str = "",
+):
     # Inference phase (Fig. 4a): evaluate selected detectors on candidate images.
     inference_histogram = patch_parallel_preprocess(
-        inference_dataset, batch_size, independent_combinations, max_workers, num_data_workers, pkl_dir=pkl_dir, seed=seed
+        inference_dataset,
+        batch_size,
+        reference_model.independent_combinations,
+        max_workers,
+        num_data_workers,
+        pkl_dir=pkl_dir,
+        seed=seed,
+        cache_suffix=cache_suffix,
     )
 
     inference_histogram = compute_mean_std_dict(inference_histogram)
-
     inference_histogram = {
-        k: inference_histogram[k] for k in independent_keys_group if k in inference_histogram
+        k: inference_histogram[k]
+        for k in reference_model.independent_keys
+        if k in inference_histogram
     }
 
     # Inference phase (Fig. 4b): map statistics to stored ECDFs for two-sided p-values.
-    input_samples_pvalues = calculate_pvals_from_cdf(reference_cdfs, inference_histogram, test_type)
+    input_samples_pvalues = calculate_pvals_from_cdf(
+        reference_model.reference_cdfs, inference_histogram, test_type
+    )
     independent_tests_pvalues = np.array(input_samples_pvalues)
     independent_tests_pvalues = np.clip(independent_tests_pvalues, 0, 1)
 
     # Inference phase (Fig. 4c): aggregate independent p-values into a unified score.
-    ensembled_stats, ensembled_pvalues = perform_ensemble_testing(independent_tests_pvalues, ensemble_test)
+    ensembled_stats, ensembled_pvalues = perform_ensemble_testing(
+        independent_tests_pvalues, ensemble_test
+    )
     ensembled_pvalues = np.array(ensembled_pvalues)
 
     if return_logits:
         return {
-            'scores': 1 - ensembled_pvalues,
-            'n_tests': len(list(independent_keys_group))
+            "scores": 1 - ensembled_pvalues,
+            "n_tests": len(list(reference_model.independent_keys)),
         }
 
     predictions = [1 if pval < threshold else 0 for pval in ensembled_pvalues]
     results = {
-        'scores': ensembled_pvalues,
-        'n_tests': len(list(independent_keys_group)),
-        'predictions': predictions,
+        "scores": ensembled_pvalues,
+        "n_tests": len(list(reference_model.independent_keys)),
+        "predictions": predictions,
     }
 
-    return results
-
-
-def inference_multiple_patch_test(
-    reference_dataset,
-    inference_dataset,
-    independent_statistics_keys_group,
-    batch_size=128,
-    threshold=0.05,
-    ensemble_test='stouffer',
-    max_workers=128,
-    num_data_workers=2,
-    output_dir='logs',
-    pkl_dir='pkls',
-    return_logits=False,
-    cdf_bins=500,
-    test_type=TestType.LEFT,
-    logger=None,
-    seed=42,
-    reference_cache_suffix="",
-    cache_suffix="",
-):
-    """
-    Simplified version of patch test for inference: no tuning, no clique finding.
-    Uses all combinations and applies ensemble testing.
-    """
-    print(f"[INFO] Running inference-only test with statistics={independent_statistics_keys_group}")
-
-    # Generate all combinations for training
-    independent_combinations = interpret_keys_to_combinations(independent_statistics_keys_group)
-
-    if reference_dataset is None:
-        raise ValueError("reference_dataset must be provided for inference")
-
-    # Inference phase (Fig. 4a): compute stored statistics on reference real images.
-    real_population_histogram = patch_parallel_preprocess(
-        reference_dataset, batch_size, independent_combinations, max_workers, num_data_workers, pkl_dir=pkl_dir, seed=seed, cache_suffix=reference_cache_suffix,
-    )
-
-    real_population_histogram = compute_mean_std_dict(real_population_histogram)
-    real_population_histogram = remove_nans_from_tests(real_population_histogram)
-
-    real_population_histogram = {k: v for k, v in real_population_histogram.items() if k in independent_statistics_keys_group}
-
-    # Stage 1.2 reuse: ECDF modeling from real reference set for inference cache.
-    real_population_cdfs = {test_id: compute_cdf(values, bins=cdf_bins, test_id=test_id) for test_id, values in real_population_histogram.items()}
-
-    # Tuning Pvalues
-    tuning_real_population_pvals = calculate_pvals_from_cdf(real_population_cdfs, real_population_histogram, test_type)
-    tuning_real_population_pvals = np.clip(tuning_real_population_pvals, 0, 1)
-
-    keys = list(real_population_histogram.keys())
-    tuning_pvalue_distributions = tuning_real_population_pvals.T
-        
     if logger:
-        logger.log_param("num_tests", len(real_population_histogram.keys()))
-        logger.log_param("Independent keys", independent_statistics_keys_group)
-
-    print(f'Independent keys: {independent_statistics_keys_group}')
-
-    # Inference phase (Fig. 4a): evaluate selected detectors on candidate set.
-    inference_histogram = patch_parallel_preprocess(
-        inference_dataset, batch_size, independent_combinations, max_workers, num_data_workers, pkl_dir=pkl_dir, seed=seed, cache_suffix=cache_suffix,
-    )
-
-    inference_histogram = compute_mean_std_dict(inference_histogram)
-    inference_histogram = {
-        key: inference_histogram[key] for key in independent_statistics_keys_group if key in inference_histogram
-    }
-
-    # Inference phase (Fig. 4b): convert detector outputs to two-sided p-values via ECDFs.
-    input_samples_pvalues = calculate_pvals_from_cdf(real_population_cdfs, inference_histogram, test_type)
-    independent_tests_pvalues = np.array(input_samples_pvalues)
-    independent_tests_pvalues = np.clip(independent_tests_pvalues, 0, 1)
-
-    # Inference phase (Fig. 4c): aggregate p-values for final decision statistic.
-    ensembled_stats, ensembled_pvalues = perform_ensemble_testing(independent_tests_pvalues, ensemble_test)
-    ensembled_pvalues = np.array(ensembled_pvalues)
-
-    if return_logits:
-        return {
-            'scores': 1 - ensembled_pvalues,
-            'n_tests': len(list(independent_statistics_keys_group))
-        }
-
-    predictions = [1 if pval < threshold else 0 for pval in ensembled_pvalues]
-    results = {
-        'scores': ensembled_pvalues,
-        'n_tests': len(list(independent_statistics_keys_group)),
-        'predictions': predictions,
-    }
+        logger.log_param("num_tests", len(reference_model.independent_keys))
+        logger.log_param("Independent keys", reference_model.independent_keys)
 
     return results

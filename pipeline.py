@@ -10,7 +10,7 @@ from sklearn.metrics import average_precision_score, roc_curve, auc
 from torchvision import transforms
 from datasets_factory import DatasetFactory, DatasetType
 from torch.utils.data import ConcatDataset
-from stat_test import TestType, main_multiple_patch_test
+from stat_test import TestType, build_reference_model, run_inference_with_reference_model
 from utils import set_seed, balanced_testset
 
 
@@ -87,27 +87,38 @@ def run_pipeline(logger=None):
         logger.log_param("patch_sizes", patch_sizes)
         logger.log_param("test_id", test_id)
 
-    results = main_multiple_patch_test(
+    reference_model = build_reference_model(
         reference_dataset=reference_dataset,
+        statistics=args.statistics,
+        patch_sizes=patch_sizes,
+        batch_size=args.batch_size,
+        max_workers=args.max_workers,
+        num_data_workers=args.num_data_workers,
+        pkl_dir=dataset_pkls_dir,
+        seed=args.seed,
+        cdf_bins=args.cdf_bins,
+        ensemble_test=args.ensemble_test,
+        chi2_bins=args.chi2_bins,
+        ks_pvalue_abs_threshold=args.ks_pvalue_abs_threshold,
+        cremer_v_threshold=args.cremer_v_threshold,
+        preferred_statistics=args.preferred_statistics,
+        test_type=TestType.BOTH,
+        logger=logger,
+    )
+
+    results = run_inference_with_reference_model(
+        reference_model=reference_model,
         inference_dataset=inference_dataset,
         batch_size=args.batch_size,
         threshold=args.threshold,
-        patch_sizes=patch_sizes,
-        statistics=args.statistics,
         ensemble_test=args.ensemble_test,
         max_workers=args.max_workers,
         num_data_workers=args.num_data_workers,
-        output_dir=args.output_dir,
         pkl_dir=dataset_pkls_dir,
         return_logits=True,
-        chi2_bins=args.chi2_bins,
-        cdf_bins=args.cdf_bins,
-        ks_pvalue_abs_threshold=args.ks_pvalue_abs_threshold,
-        cremer_v_threshold=args.cremer_v_threshold,
         test_type=TestType.BOTH,
         logger=logger,
         seed=args.seed,
-        preferred_statistics=args.preferred_statistics
     )
 
     if labels is not None:

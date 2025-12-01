@@ -11,7 +11,7 @@ from torch.utils.data import ConcatDataset
 from torchvision import transforms
 from datasets_factory import DatasetFactory, DatasetType
 from data_utils import ImageDataset, JPEGCompressionTransform
-from stat_test import TestType, inference_multiple_patch_test
+from stat_test import TestType, build_reference_model, run_inference_with_reference_model
 from utils import (
     balanced_testset,
     set_seed,
@@ -102,23 +102,40 @@ def run_inference(logger=None):
         logger.log_param("reference_transform_cache_suffix", reference_cache_suffix or "none")
         logger.log_param("inference_transform_cache_suffix", inference_cache_suffix or "none")
 
-    results = inference_multiple_patch_test(
+    reference_model = build_reference_model(
         reference_dataset=reference_dataset,
+        statistics=None,
+        patch_sizes=None,
+        batch_size=args.batch_size,
+        max_workers=args.max_workers,
+        num_data_workers=args.num_data_workers,
+        pkl_dir=dataset_pkls_dir,
+        seed=args.seed,
+        cdf_bins=args.cdf_bins,
+        ensemble_test=args.ensemble_test,
+        chi2_bins=args.cdf_bins,
+        ks_pvalue_abs_threshold=getattr(args, "uniform_p_threshold", 0.05),
+        cremer_v_threshold=getattr(args, "cremer_v_threshold", 0.05),
+        preferred_statistics=None,
+        independent_keys=args.independent_keys,
+        test_type=TestType.BOTH,
+        logger=logger,
+        cache_suffix=reference_cache_suffix,
+    )
+
+    results = run_inference_with_reference_model(
+        reference_model=reference_model,
         inference_dataset=inference_dataset,
-        independent_statistics_keys_group=args.independent_keys,
         batch_size=args.batch_size,
         threshold=args.threshold,
         ensemble_test=args.ensemble_test,
         max_workers=args.max_workers,
         num_data_workers=args.num_data_workers,
-        output_dir=args.output_dir,
         pkl_dir=dataset_pkls_dir,
         return_logits=True,
-        cdf_bins=args.cdf_bins,
         test_type=TestType.BOTH,
         logger=logger,
         seed=args.seed,
-        reference_cache_suffix=reference_cache_suffix,
         cache_suffix=inference_cache_suffix,
     )
 
