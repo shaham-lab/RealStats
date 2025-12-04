@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SUFT: Turning Sand to Gold: Recycling Data to Bridge On-Policy and Off-Policy Learning via Causal Bound</title>
+    <title>RealStats: Real-Only Statistical Framework for Fake Image Detection</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/png" href="assets/SUFT_logo_small.png">
     <style>
@@ -262,26 +262,26 @@
 <body>
     <header>
         <div class="container">
-            <h1>Turning Sand to Gold: Recycling Data to Bridge On-Policy and Off-Policy Learning via Causal Bound</h1>
-            <div class="venue">Poster at the 39th Conference on Neural Information Processing Systems (NeurIPS 2025)</div>
+            <h1>RealStats: Real-Only Statistical Framework for Fake Image Detection</h1>
+            <div class="venue">Preprint · Target: AISTATS 2026</div>
             <div class="authors">
-                <strong><a href="https://www.linkedin.com/in/talfiskus/" target="_blank">Tal Fiskus</a></strong>, 
+                <strong><a href="https://www.linkedin.com/in/haim-zisman/" target="_blank">Haim Zisman</a></strong>,
                 <strong><a href="https://www.linkedin.com/in/urishaham/" target="_blank">Uri Shaham</a></strong>
             </div>
             <div class="affiliations">
-                Bar-Ilan University
+                Bar-Ilan University · Shaham Lab
             </div>
             <div class="links">
-                <a href="https://neurips.cc/virtual/2025/poster/119864" class="link-button" target="_blank">
-                    <i class="fas fa-book-open"></i> NeurIPS Page
+                <a href="#" class="link-button" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Paper (Soon)
                 </a>
-                <a href="https://openreview.net/forum?id=5UtsjOGsDx" class="link-button" target="_blank">
-                    <i class="fas fa-link"></i> OpenReview
+                <a href="supplementary.tex" class="link-button" target="_blank">
+                    <i class="fas fa-layer-group"></i> Supplementary
                 </a>
-                <a href="https://arxiv.org/abs/2507.11269" class="link-button" target="_blank">
-                    <i class="fas fa-file-pdf"></i> ArXiv
+                <a href="#" class="link-button" target="_blank">
+                    <i class="fas fa-link"></i> OpenReview (Soon)
                 </a>
-                <a href="https://github.com/shaham-lab/TurningSandToGold" class="link-button" target="_blank">
+                <a href="https://github.com/shaham-lab/RealStats" class="link-button" target="_blank">
                     <i class="fab fa-github"></i> Code
                 </a>
                 <a href="#" class="link-button" id="copy-bibtex-btn" target="_blank">
@@ -294,12 +294,12 @@
                         const notif = document.getElementById('bibtex-notification');
                         btn.addEventListener('click', function(e) {
                             e.preventDefault();
-                            const bibtex = `@inproceedings{fiskus2025turning,
-                                                title={Turning Sand to Gold: Recycling Data to Bridge On-Policy and Off-Policy Learning via Causal Bound},
-                                                author={Tal Fiskus and Uri Shaham},
-                                                journal={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
-                                                year={2025},
-                                                url={https://openreview.net/forum?id=5UtsjOGsDx}
+                            const bibtex = `@inproceedings{zisman2026realstats,
+                                                title={RealStats: A Real-Only Statistical Framework for Fake Image Detection},
+                                                author={Haim Zisman and Uri Shaham},
+                                                booktitle={AISTATS},
+                                                year={2026},
+                                                url={https://github.com/shaham-lab/RealStats}
                                             }`;
                             navigator.clipboard.writeText(bibtex).then(function() {
                                 notif.style.display = 'inline-block';
@@ -319,184 +319,130 @@
         <section class="abstract">
           <h2>Abstract</h2>
           <p>
-            Deep reinforcement learning (DRL) agents excel in solving complex decision-making tasks across various domains. However, they often require a substantial number of training steps and a vast experience replay buffer, leading to significant computational and resource demands. To address these challenges, we introduce a novel theoretical result that leverages the Neyman-Rubin potential outcomes framework into DRL. Unlike most methods that focus on bounding the counterfactual loss, we establish a causal bound on the factual loss, which is analogous to the on-policy loss in DRL. This bound is computed by storing past value network outputs in the experience replay buffer, effectively utilizing data that is usually discarded. Extensive experiments across the Atari 2600 and MuJoCo domains on various agents, such as DQN and SAC, achieve <strong>up to 383%</strong> higher reward ratio, outperforming the same agents without our proposed term, and reducing the experience replay buffer size by <strong>up to 96%</strong>, significantly improving <strong>sample efficiency at a negligible cost</strong>.
+            Detecting AI-generated images demands detectors that remain interpretable and resilient to distribution shifts. <strong>RealStats</strong> frames detection as rigorous hypothesis testing using only real-image statistics. The method computes multiple training-free test statistics, converts them into calibrated <em>p</em>-values via empirical CDFs, and aggregates them with classical ensembling. This real-only pipeline yields interpretable probabilities with principled error control while matching the performance of leading training-free baselines across a 180K-image benchmark spanning CNNSpot, Universal Fake Detect, Stable Diffusion Face, Synthbuster, and GenImage datasets.
         </p>
         </section>
 
         <!-- Results -->
         <section>
-            <h2>SUFT Achieves Substantial Reward Improvements</h2>
-            
+            <h2>Statistically Grounded, Still High-Performing</h2>
+
             <div class="figure">
-                <img src="assets/comparison_bar_charts.png" alt="Mean reward ratio comparison between agents using the additional SUFT term and the baseline agents without it across 57 Atari games and five MuJoCo environments, highlighting the profound reward gains across diverse agents and domains." " class="responsive-figure-img">
-                <script>
-                    // Responsive image width for phones
-                    document.addEventListener('DOMContentLoaded', function() {
-                        function adjustFigureImg() {
-                            var imgs = document.querySelectorAll('.responsive-figure-img');
-                            imgs.forEach(function(img) {
-                                if (window.innerWidth <= 768) {
-                                    img.style.maxWidth = '100%';
-                                } else {
-                                    img.style.maxWidth = '100%';
-                                }
-                            });
-                        }
-                        adjustFigureImg();
-                        window.addEventListener('resize', adjustFigureImg);
-                    });
-                </script>
+                <img src="assets/images/pvalues_distribution/pvalues_figure.png" alt="Comparison between classifier scores and calibrated p-values for real and fake images.">
                 <p class="figure-caption">
-                    Mean reward ratio comparison between agents using the additional SUFT term and the baseline agents without it across 57 Atari games and five MuJoCo environments, highlighting the profound reward gains across diverse agents and domains.
+                    RealStats outputs calibrated <em>p</em>-values grounded in the real-image distribution, replacing opaque realness scores with statistically meaningful probabilities.
                 </p>
             </div>
 
-            <h3>Improve Sample Efficiency at a Negligible Cost</h3>
+            <h3>Statistical Grounding & Benchmark Highlights</h3>
             <div class="results-grid">
                 <div class="result-card">
-                    <div class="metric">+437.05%</div>
-                    <div class="label">Mean reward ratio improvement.</div>
+                    <div class="metric">Real-Only</div>
+                    <div class="label">Hypothesis tests calibrated solely on real-image ECDFs—no synthetic training required.</div>
                 </div>
                 <div class="result-card">
-                    <div class="metric">-96%</div>
-                    <div class="label">Reduction in resource demands.</div>
+                    <div class="metric">180K</div>
+                    <div class="label">Images across CNNSpot, UFD, Stable Diffusion Face, Synthbuster, and GenImage.</div>
                 </div>
                 <div class="result-card">
-                    <div class="metric">x25</div>
-                    <div class="label">Smaller replay buffer size.</div>
+                    <div class="metric">0.775</div>
+                    <div class="label">Average AUC (Min-<em>p</em> ensemble) with lower variance than baselines.</div>
+                </div>
+                <div class="result-card">
+                    <div class="metric">0.756</div>
+                    <div class="label">Average AP, matching state-of-the-art training-free detectors.</div>
                 </div>
             </div>
 
             <p style="margin-top: 30px; font-size: 1.05em;">
-              <strong>
-                SUFT</strong> leads to significant improvements in convergence rates and reward outcomes, achieving a <strong>437.05%</strong> mean reward ratio gain while using <strong>25 times smaller replay buffer size</strong>. This reflects in a <strong>96%</strong> reduction in resource demands.
-                These results underscore the potential of our approach to obtain high-performance DRL agents with significantly smaller buffers, paving the way for more computationally efficient and accessible DRL methods by enhancing <strong>sample efficiency at a negligible cost</strong>.
+              RealStats centers interpretability first: calibrated <em>p</em>-values quantify uncertainty with controlled false positives, while accuracy remains on par with leading training-free baselines across all evaluated generators.
             </p>
         </section>
 
-        <!-- Method -->
-      <section>
-        <h2>SUFT Causal Bound</h2>
-        <p style="font-size: 1.05em; line-height: 1.8; text-align: justify;">
-            We establish a causal upper bound on the unobserved factual loss using the observed counterfactual loss and the estimated treatment effect:
-        </p>
-      
-        <div style="text-align: center; font-size: 1.3em; margin: 40px 0; overflow-x: auto;">
-          \[
-            \epsilon_{F_{\phi}} 
-            \leq 
-            \epsilon_{CF_{\phi}}
-            +
-            \psi_{\phi} 
-            + 
-            \delta
-          \]
-        </div>
-        <p style="font-size: 1.05em; line-height: 1.8; text-align: justify;">
-            The interpretation of this causal upper bound in the DRL framework establishes an upper bound to the on-policy loss, by the standard off-policy loss and an additional <strong>SUFT off-policy evaluation term (OPE)</strong>:
-        </p>
-        <div style="text-align: center; font-size: 1.3em; margin: 40px 0; overflow-x: auto;">
-          \[
-            \epsilon_{\text{On-Policy}_Q}
-            \leq
-            \epsilon_{\text{Off-Policy}_Q} 
-            +
-            \psi_{\text{SUFT}_Q}
-            + 
-            \delta
-          \]
-        </div>
-        <p style="font-size: 1.05em; line-height: 1.8; text-align: justify;">
-            We are optimizing the SUFT causal bound on the loss, yielding the following SUFT objective term:
-        </p>
-        <div style="text-align: center; font-size: 1.3em; margin: 40px 0; overflow-x: auto;">
-            \[
-                \epsilon_{\text{Off-Policy}_Q} 
-                +
-                \lambda_\text{TF}\cdot \psi_{\text{SUFT}_{Q}}
-            \]
-        </div>
-        <p style="font-size: 1.05em; line-height: 1.8; text-align: justify;">
-            In value-based methods such as DQN agents, the SUFT OPE term is seamlessly added to the standard loss function, while in Actor-Critic architectures, it is incorporated into the critic's loss.
-            To compute the SUFT OPE term, we store the behavior policy value network outputs. This result in an experience tuple of the form \(\left(s, a, r, s', Q(s, a;\theta_\text{behavior})\right)\), instead of the standard \(\left(s, a, r, s'\right)\)
-        </p>
+        <!-- Method Overview -->
+        <section>
+          <h2>Overview of the RealStats Pipeline</h2>
+          <p style="font-size: 1.05em; line-height: 1.8; text-align: justify;">
+            RealStats operates in two phases. During <strong>null distribution modeling</strong>, we compute diverse training-free statistics on real images, estimate their empirical CDFs, and select an independent subset using \(\chi^2\)-based tests. At <strong>inference</strong>, incoming images are mapped to <em>p</em>-values through cached ECDFs and aggregated via Stouffer or Min-<em>p</em> rules, yielding interpretable decisions with provable error control.
+          </p>
+          <div class="figure">
+            <img src="assets/images/fig3/calibration_no_background.png" alt="Null distribution modeling phase with ECDF estimation and independence graph extraction." class="responsive-figure-img">
+            <p class="figure-caption">
+              Null distribution modeling: statistics computed on real data are converted into ECDFs, pruned by independence tests, and arranged into a maximal clique that guarantees valid multi-test aggregation.
+            </p>
+          </div>
+          <div class="figure">
+            <img src="assets/images/fig4/inference.png" alt="Inference phase mapping statistics to p-values and aggregating them." class="responsive-figure-img">
+            <p class="figure-caption">
+              Inference: selected statistics are evaluated on a test image, transformed into <em>p</em>-values using stored ECDFs, and aggregated into a single interpretable probability of the image being real.
+            </p>
+          </div>
           <div class="method-grid">
             <div class="method-card">
-                <h4><i class="fas fa-scale-balanced"></i> Causal Bound Theorem</h4>
-                <p>We formalize an upper bound in the causal framework and integrate it into the DRL framework as an upper bound for the on-policy loss.</p>
+                <h4><i class="fas fa-scale-balanced"></i> Formal Validity</h4>
+                <p>Two-sided empirical <em>p</em>-values remain uniform under the null, ensuring controlled false positives when testing against real-image distributions.</p>
             </div>
             <div class="method-card">
-                <h4><i class="fas fa-arrows-rotate"></i> Recycling Data</h4>
-                <p>Our approach effectively transforms overlooked data into valuable causal insights, metaphorically <strong>turning sand data into gold</strong>.</p>
+                <h4><i class="fas fa-screwdriver-wrench"></i> Modular Statistics</h4>
+                <p>Any scalar detector computed on real images can be added, ECDF-modeled, and aggregated without retraining.</p>
             </div>
             <div class="method-card">
-                <h4><i class="fas fa-globe"></i> Universal Implementation</h4>
-                <p>Our method is applicable to any DRL agent with a V or Q-value network that influences its policy. </p>
+                <h4><i class="fas fa-shuffle"></i> Adaptable Aggregation</h4>
+                <p>Stouffer and Min-<em>p</em> ensembles hedge against failing statistics and retain power across emerging generators.</p>
             </div>
         </div>
-          <p class="figure-caption" style="text-align: center; font-size: 0.95em; color: #6c757d; font-style: italic;">
-              To the best of our knowledge, we are the first to introduce an upper bound on the factual loss within the causal framework and adapt it to the DRL setting, thereby bounding the on-policy loss.
-          </p>
-      </section>
-      
-      <!-- MathJax rendering support -->
-      <script>
-        window.MathJax = {
-          tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-          svg: { fontCache: 'global' }
-        };
-      </script>
-      <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+        </section>
 
-        <!-- Key Insight -->
+        <!-- Performance Figures -->
         <section>
-            <h2>Massive Performance Boost</h2>
+            <h2>Consistent Performance Across Generators</h2>
             <div class="figure">
-                <img src="assets/atari_all_environments_improvements.png" alt="Log-scaled reward improvements comparison between agents using the additional SUFT term and the baseline agents without it across 57 Atari games. The results demonstrate the superior performance of our method across the majority of games. The red line indicates a 10% improvement, and the green line represents a 100% improvement. Left: Double DQN SUFT outperforms the baseline agent in 35 out of the 40 valid games; Right: PPO SUFT outperforms the baseline agent in 39 out of the 42 valid games.">
+                <img src="assets/images/fig6/polygon_plot.png" alt="Radar plot comparing AUC per generator across methods." class="responsive-figure-img">
                 <p class="figure-caption">
-                    Log-scaled reward improvements comparison between agents using the additional SUFT term and the baseline agents without it across 57 Atari games. The red line indicates a 10% improvement, and the green line represents a 100% improvement. Left: Double DQN; Right: PPO.
+                    Per-generator AUC comparison: RealStats (Min-<em>p</em>) matches leading training-free baselines while reducing variance across datasets such as GauGAN, CycleGAN, SDXL, and ADM.
                 </p>
             </div>
             <p style="margin-top: 30px; font-size: 1.05em; line-height: 1.8;">
-                The results demonstrate the superior performance of our method across the majority of games. Double DQN SUFT outperforms the baseline agent in 35 out of the 40 valid games. PPO SUFT outperforms the baseline agent in 39 out of the 42 valid games.
+                The radar plot highlights balanced behavior: while single-statistic baselines peak on specific generators, RealStats maintains robust AUC across the full benchmark, underscoring its adaptability to distribution shifts.
             </p>
         </section>
 
-        <!-- Key Results Figure -->
         <section>
-            <h2>Outperforming an Average Human</h2>
+            <h2>Statistical Significance at a Glance</h2>
             <div class="figure">
-                <img src="assets/Selected_best_Atari2600_learning_curves.png" alt="Learning curves comparison between agents using the SUFT OPE term and the baseline agents without it across selected Atari games. The red line indicates human-level performance, showing that SUFT not only surpasses the baseline agent but can even exceed human rewards. Top: Double DQN; Bottom: PPO.">
+                <img src="assets/images/pvalues_distribution/significance_grid.png" alt="Grid of p-value significance across detectors and datasets." class="responsive-figure-img">
                 <p class="figure-caption">
-                    Learning curves comparison between agents using the SUFT OPE term and the baseline agents without it across selected Atari games. The red line indicates human-level performance, showing that SUFT not only surpasses the baseline agent but can even exceed human rewards. 
-                    <br>
-                    Top: Double DQN; Bottom: PPO.
+                    Significance grid showing calibrated <em>p</em>-values across detectors and generators. RealStats keeps real samples uniform while driving fake samples toward low <em>p</em>-values, delivering interpretable, hypothesis-test-friendly outputs.
                 </p>
             </div>
             <p style="margin-top: 30px; font-size: 1.05em; line-height: 1.8;">
-                In several Atari games, SUFT not only surpasses the baseline agent but also achieves higher rewards than an average human. This achievement highlights the potential of our method to boost agents' performance even above the human level, while keeping constrained environment interactions and resource demands.
+                Integrating additional statistics such as <em>ManifoldBias</em> further improves separation on challenging generators (e.g., GauGAN, CycleGAN, SAN), illustrating the framework’s plug-and-play adaptability.
             </p>
         </section>
 
-        <!-- Ablation Study: SUFT Surpasses Baseline -->
         <section>
-            <h2>SUFT Surpasses Baselines: Ablation Study</h2>
-            <div class="figure">
-                <img src="assets/ablation_study.png" alt="Ablation study table showing SUFT surpasses a baseline that uses a 25x larger buffer (96% reduction).">
-                <p class="figure-caption">
-                    An ablation study on the DQN agent comparing the SUFT additional term impact against enlarging the buffer size, adding a Vanilla DQN, and adding a Double DQN. The DQN, Vanilla DQN, Double DQN, and SUFT DQN use a 4K buffer size. All agents are using L2 loss.
-                </p>
+            <h2>Interpretability & Adaptability in Our Experiments</h2>
+            <div class="method-grid">
+                <div class="method-card">
+                    <h4><i class="fas fa-eye"></i> Interpretability</h4>
+                    <p>Uniform real-sample <em>p</em>-values and calibrated thresholds (Fig. p-values grid) let practitioners audit error rates and diagnose uncertain cases without opaque logits.</p>
+                </div>
+                <div class="method-card">
+                    <h4><i class="fas fa-seedling"></i> Adaptability</h4>
+                    <p>Adding statistics like <em>ManifoldBias</em> or texture features immediately lifts performance on tougher generators (e.g., GauGAN, SAN) with no retraining.</p>
+                </div>
+                <div class="method-card">
+                    <h4><i class="fas fa-chart-line"></i> Stable Power</h4>
+                    <p>Across the 180K-image benchmark, both Stouffer and Min-<em>p</em> ensembles maintain AUC while avoiding the variance spikes seen in single-statistic baselines.</p>
+                </div>
             </div>
-            <p style="margin-top: 30px; font-size: 1.05em; line-height: 1.8;">
-                SUFT surpasses the baseline that has a x25 larger buffer, which is a 96% buffer size reduction.
-            </p>
         </section>
 
         <!-- Conclusion -->
         <section class="abstract">
             <h2>Conclusion</h2>
             <p>
-                This paper presents SUFT, a causal upper-bound loss optimization method that enhances DRL sample efficiency and reduces computational demands at a <strong>negligible cost</strong>. We begin by establishing a provable bound on the factual loss within the Neyman-Rubin potential outcomes framework and seamlessly adapting it to the DRL framework, showing that on-policy loss is bounded by every agent's standard off-policy loss and an additional SUFT OPE term. This term is computable by storing past value network outputs in the experience replay buffer, thereby reusing discarded data to improve agents' performance. Experimental results across diverse environments and agents show that our method leads to significant improvements in convergence rates and reward outcomes.
+                RealStats delivers interpretable, training-free fake-image detection grounded solely in real-image statistics. By estimating ECDFs on real data, enforcing independence, and aggregating calibrated <em>p</em>-values, the framework attains state-of-the-art training-free performance (0.775 AUC, 0.756 AP) across a 180K-image benchmark while remaining modular to new detectors and distribution shifts.
 
             </p>
         </section>
@@ -504,12 +450,12 @@
         <section>
             <h2>Citation</h2>
             <div class="citation-box">
-              @inproceedings{fiskus2025turning,<br>
-              &nbsp;&nbsp;title={Turning Sand to Gold: Recycling Data to Bridge On-Policy and Off-Policy Learning via Causal Bound},<br>
-              &nbsp;&nbsp;author={Tal Fiskus and Uri Shaham},<br>
-              &nbsp;&nbsp;journal={The Thirty-ninth Annual Conference on Neural Information Processing Systems},<br>
-              &nbsp;&nbsp;year={2025},<br>
-              &nbsp;&nbsp;url={https://openreview.net/forum?id=5UtsjOGsDx}<br>
+              @inproceedings{zisman2026realstats,<br>
+              &nbsp;&nbsp;title={RealStats: A Real-Only Statistical Framework for Fake Image Detection},<br>
+              &nbsp;&nbsp;author={Haim Zisman and Uri Shaham},<br>
+              &nbsp;&nbsp;booktitle={International Conference on Artificial Intelligence and Statistics},<br>
+              &nbsp;&nbsp;year={2026},<br>
+              &nbsp;&nbsp;url={https://github.com/shaham-lab/RealStats}<br>
               }
             </div>
         </section>
@@ -541,9 +487,9 @@
 
     <footer style="text-align: center; padding: 40px 0; color: #6c757d;">
         <div class="links_footer">
-            <a href="https://www.linkedin.com/in/talfiskus/" target="_blank">Tal Avraham Fiskus</a> ·
+            <a href="https://www.linkedin.com/in/haim-zisman/" target="_blank">Haim Zisman</a> ·
             <a href="https://www.linkedin.com/in/urishaham/" target="_blank">Uri Shaham</a> ·
-            <a href="https://neurips.cc/virtual/2025/poster/119864" target="_blank">NeurIPS 2025</a>
+            <a href="https://aistats.org" target="_blank">AISTATS</a>
         </div>
     </footer>
 </body>
