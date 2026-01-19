@@ -27,9 +27,9 @@ for i in $(seq 0 $((CONFIGS_LENGTH - 1))); do
     # Redirect all output to logs.txt
     {
         echo "Starting run $((i + 1))..."
-        echo "Command: python executor.py $CONFIG"
+        echo "Command: python pipeline.py $CONFIG"
 
-        python executor.py \
+        python pipeline.py \
             --test_type multiple_patches \
             --batch_size 64 \
             --sample_size 512 \

@@ -27,13 +27,13 @@ for i in $(seq 0 $((CONFIGS_LENGTH - 1))); do
     # Redirect all output to logs.txt
     {
         echo "Starting run $((i + 1))..."
-        echo "Command: python executor.py $CONFIG"
+        echo "Command: python inference.py $CONFIG"
 
-        python executor_inference.py \
+        python inference.py \
             --batch_size 16 \
             --output_dir "$LOGS_DIR" \
-            --num_data_workers 0 \
-            --max_workers 3 \
+            --num_data_workers 6 \
+            --max_workers 2 \
             --gpu "0" \
             $CONFIG
 

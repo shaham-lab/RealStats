@@ -524,8 +524,8 @@ def inference_multiple_patch_test(
             [p for p, l in zip(ensembled_pvalues, test_labels) if l == 1],
             os.path.join(output_dir, f"histogram_plot_{ensemble_test}_alpha_{threshold}.png"),
             "Histogram of P-values", 
-            bins=40,
-            figsize=(6, 6), title_fontsize=16, label_fontsize=14, legend_fontsize=12
+            bins=10,
+            figsize=(6, 6), title_fontsize=18, label_fontsize=16, legend_fontsize=14
         )
     
     if return_logits:

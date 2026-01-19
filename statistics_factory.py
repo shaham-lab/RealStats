@@ -56,7 +56,7 @@ STATISTIC_HISTOGRAMS = {
 
     # Paper Statistics
     'LatentNoiseCriterion': lambda: LatentNoiseCriterion(),
-    'LatentNoiseCriterion_original': lambda: LatentNoiseCriterionOriginal(),
+    'LatentNoiseCriterion_original': lambda: LatentNoiseCriterionOriginal(scores_csv="manifold_bias_criterion.csv"),
 
     # ==============================
     #    Hardcoded RIGID Statistics
