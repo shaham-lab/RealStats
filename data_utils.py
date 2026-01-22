@@ -469,3 +469,37 @@ class DFDCTestDataset(Dataset):
         if self.transform:
             img = self.transform(img)
         return img, label, path
+
+
+class JsonSplitDataset(Dataset):
+    """Dataset class for loading image paths from a JSON split file.
+
+    Expected JSON format:
+    {
+        "reference_real": ["path/to/img1.png", ...],
+        "test_real": ["path/to/img2.png", ...],
+        "test_fake": ["path/to/img3.png", ...]
+    }
+    """
+
+    def __init__(self, json_path, split, label=0, transform=None):
+        self.transform = transform
+        self.label = label
+
+        with open(json_path, "r") as f:
+            data = json.load(f)
+
+        if split not in data:
+            raise KeyError(f"Split '{split}' not found in {json_path}")
+
+        self.image_paths = data[split]
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        path = self.image_paths[idx]
+        img = Image.open(path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        return img, self.label, path
