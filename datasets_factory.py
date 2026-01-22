@@ -2,6 +2,8 @@ from enum import Enum
 from data_utils import (
     CocoDataset,
     CrossDomainRealDataset,
+    DFDCTestDataset,
+    DFDReferenceDataset,
     EmptyDataset,
     ImageDataset,
     RealStatsDataset,
@@ -134,6 +136,31 @@ class DatasetType(Enum):
     UNIVERSAL_FAKE_DETECT_DALLE = _dataset_entry(RealStatsGenerators.UNIVERSAL_FAKE_DETECT_DALLE.value)
     UNIVERSAL_FAKE_DETECT_GLIDE_100_27 = _dataset_entry(RealStatsGenerators.UNIVERSAL_FAKE_DETECT_GLIDE_100_27.value)
     UNIVERSAL_FAKE_DETECT_GLIDE_50_27 = _dataset_entry(RealStatsGenerators.UNIVERSAL_FAKE_DETECT_GLIDE_50_27.value)
+
+    # === DeepFakeBenchmark (FF++ reference + DFDC test) ===
+    DEEPFAKE_BENCHMARK = {
+        # Train / reference: all images from FF++ original_sequences (real)
+        "reference_real": {
+            "path": "data/DeepFakeBenchmark/fakeforensicsplusplus/original_sequences",
+            "class": lambda root, label, transform=None: DFDReferenceDataset(
+                root, label, transform=transform
+            ),
+        },
+        # Test real frames: DFDC.json entries under DFDC_Real
+        "test_real": {
+            "path": "data/DeepFakeBenchmark/DFDC",
+            "class": lambda root, label, transform=None: DFDCTestDataset(
+                root, label, transform=transform, json_file="DFDC.json", filter_label=0
+            ),
+        },
+        # Test fake frames: DFDC.json entries under DFDC_Fake
+        "test_fake": {
+            "path": "data/DeepFakeBenchmark/DFDC",
+            "class": lambda root, label, transform=None: DFDCTestDataset(
+                root, label, transform=transform, json_file="DFDC.json", filter_label=1
+            ),
+        },
+    }
 
     def get_paths(self):
         return self.value

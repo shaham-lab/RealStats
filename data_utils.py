@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import random
 from PIL import Image
@@ -344,3 +345,127 @@ def create_inference_dataset(real_dir, fake_dir, num_samples_per_class, classes=
     if shuffle:
         random.shuffle(inference_data)
     return inference_data
+
+
+# ==========================
+#   NEW: DeepFakeBenchmark datasets
+# ==========================
+
+class DFDReferenceDataset(Dataset):
+    """Reference (train) portion of DeepFakeBenchmark (FakeForensics++ real frames)."""
+
+    def __init__(self, root_dir, label=0, transform=None):
+        self.transform = transform
+        self.label = label
+
+        # collect all frames recursively
+        paths = []
+        for root, _, files in os.walk(root_dir):
+            for f in files:
+                if f.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    paths.append(os.path.join(root, f))
+
+        self.image_paths = paths
+
+        if len(self.image_paths) == 0:
+            print(f"[WARNING] DFDReferenceDataset: no images under: {root_dir}")
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        path = self.image_paths[idx]
+        img = Image.open(path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        return img, self.label, path
+    
+
+class DFDCTestDataset(Dataset):
+    """
+    DFDC test dataset loader for frame-based detection using DFDC.json structure.
+
+    JSON structure example (relative to DFDC root_dir):
+
+    {
+      "DFDC": {
+        "DFDC_Real": {
+          "train": {},
+          "test": {
+            "aalscayrfi": {
+              "label": "DFDC_Real",
+              "frames": [
+                "DFDC\\test\\frames\\aalscayrfi\\000.png",
+                "DFDC\\test\\frames\\aalscayrfi\\009.png",
+                ...
+              ]
+            },
+            ...
+          }
+        },
+        "DFDC_Fake": {
+          ...
+        }
+      }
+    }
+
+    We treat each frame path in `frames` as a separate sample.
+
+    Args:
+        root_dir (str): root directory for DFDC (where DFDC.json lives).
+        label (int): kept for factory compatibility, but not used for labeling.
+        transform (callable, optional): transform to apply to each image.
+        json_file (str): name of the JSON file (default "DFDC.json").
+        filter_label (int or None): if 0 → only DFDC_Real, if 1 → only DFDC_Fake,
+                                    if None → both.
+    """
+    def __init__(self, root_dir, label=0, transform=None, json_file="DFDC.json", filter_label=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.filter_label = filter_label
+
+        json_path = os.path.join(root_dir, json_file)
+        with open(json_path, "r") as f:
+            data = json.load(f).get("DFDC", {})
+
+        samples = []
+
+        for category_name, splits in data.items():
+            # determine label from category name
+            cat_label = 0 if "Real" in category_name else 1
+
+            if self.filter_label is not None and cat_label != self.filter_label:
+                continue
+
+            test_split = splits.get("test", {})
+            for entry in test_split.values():
+                for frame_rel in entry.get("frames", []):
+                    # ---- normalize ----
+                    frame_rel = frame_rel.replace("\\", "/")
+
+                    # ---- strip redundant "DFDC/" prefix ----
+                    if frame_rel.startswith("DFDC/"):
+                        frame_rel = frame_rel[len("DFDC/"):]
+
+                    # ---- final absolute path ----
+                    abs_path = os.path.join(root_dir, frame_rel)
+
+                    samples.append((abs_path, cat_label))
+
+        # match RealStatsDataset contract
+        self.image_paths = [p for p, _ in samples]
+        self.labels = [l for _, l in samples]
+
+        if len(self.image_paths) == 0:
+            print(f"[WARNING] DFDCTestDataset: no samples loaded from {json_file}")
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        path = self.image_paths[idx]
+        label = self.labels[idx]
+        img = Image.open(path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        return img, label, path
