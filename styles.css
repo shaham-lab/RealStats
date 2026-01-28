@@ -78,6 +78,7 @@ h1 {
   opacity: 0.9;
   margin-bottom: 30px;
   color: #dce7ff;
+  text-decoration: none;
 }
 
 /* ======================
@@ -606,3 +607,4 @@ h3 {
     opacity: 1;
     transform: translateY(0);
 }
+
