@@ -1,4 +1,5 @@
-# RealStats: Real-Only Statistical Framework for Fake Image Detection
+# RealStats: Real-Only Statistical Framework for Fake Image Detection (AISTATS 2026 Spotlight)
+
 Authors: [Haim Zisman](https://www.linkedin.com/in/haim-zisman/), [Uri Shaham](https://www.linkedin.com/in/urishaham/)
 
 >As generative models continue to evolve, detecting AI-generated images remains a critical challenge. Although effective detection methods exist, they often lack formal interpretability and may rely on implicit assumptions about fake content, potentially limiting their robustness to distributional shifts.
@@ -7,11 +8,11 @@ This framework is generic, flexible, and training-free, making it well suited fo
 
 <div align="center">
 
-<a href="https://">
-  <img src="https://img.shields.io/static/v1?label=Project&message=Website (Soon)&color=9a031e" height="20.5">
+<a href="https://shaham-lab.github.io/RealStats/">
+  <img src="https://img.shields.io/static/v1?label=Project&message=Website&color=9a031e" height="20.5">
 </a> 
-<a href="https://arxiv.org/">
-  <img src="https://img.shields.io/static/v1?label=Paper&message=arXiv (Soon)&color=fb5607" height="20.5">
+<a href="https://arxiv.org/abs/2601.18900">
+  <img src="https://img.shields.io/static/v1?label=Paper&message=arXiv&color=fb5607" height="20.5">
 </a>
 
 <br>
@@ -131,7 +132,7 @@ python pipeline.py \
     --num_samples_per_class -1 \
     --num_data_workers 3 \
     --max_workers 3 \
-    --gpu "0" \
+    --gpu "0" \ 
     --statistics RIGID.DINO.05 RIGID.DINO.10 RIGID.DINOV3.VITS16.05 RIGID.DINOV3.VITS16.10 RIGID.CLIPOPENAI.05 RIGID.CLIPOPENAI.10 RIGID.CONVNEXT.05 RIGID.CONVNEXT.10 \
     --ensemble_test minp \
     --patch_divisors 0 \
@@ -150,7 +151,7 @@ For inference only: `scripts/run_inference_hardcoded.sh`
 
 **Tips**
 - Use `CUDA_VISIBLE_DEVICES` (or the `--gpu` flag) to pin the job to specific GPUs.  
-- Statistics are cached as `.npy` files per image in the `pkls_dir` so subsequent runs reuse precomputed histograms.  
+- Statistics are cached as `.npy` files per image in the `pkls` dir so subsequent runs reuse precomputed histograms.  
 - MLflow logs AUC/AP, ROC curves, and intermediate artifacts to `outputs/` by default.
 
 ---
@@ -171,10 +172,11 @@ For inference only: `scripts/run_inference_hardcoded.sh`
 1. **Prepare real-only reference sets** using the provided CSV manifests (or your own) so ECDFs are fit without synthetic leakage. The `reproducibility/` directory includes the original splits used in the paper, together with the raw scores from the ManifoldBias method evaluated on this data.
 
 2. **Calibrate statistics** by running the pipeline once per dataset configuration. This builds the cache of real statistics in `pkls/`.  
+
 3. **Evaluate generators** with `--ensemble_test minp` (paper default) or `--ensemble_test stouffer` for robustness to distributed evidence.  
 
 
-For the full 180K-image benchmark reported in the manuscript, iterate over the provided `DatasetType` entries (CNNSpot, Universal Fake Detect, GenImage, SynthBuster, Stable Diffusion Faces) and aggregate metrics.
+For the full 160K-image benchmark reported in the manuscript, iterate over the provided `DatasetType` entries (CNNSpot, Universal Fake Detect, GenImage, SynthBuster, Stable Diffusion Faces) and aggregate metrics.
 
 ---
 
@@ -186,11 +188,17 @@ Want to plug in a new statistic? Follow these steps:
 3. **Recalibrate ECDFs** by rerunning `pipeline.py` so the new statistic is cached on the reference dataset.  
 4. **Update preferred statistics** via `--preferred_statistics` if you want the clique selection to favor your detector during independence pruning.
 
+- Note: If the statistic is already known to be independent with respect to the clique, you can skip steps 3 and 4 and run `inference.py` directly, specifying both the clique statistics and the additional statistic.
 ---
 
 ## 📚 BibTeX
 ```bibtex
-Soon
+@article{zisman2026realstats,
+  title={RealStats: A Real-Only Statistical Framework for Fake Image Detection},
+  author={Zisman, Haim and Shaham, Uri},
+  journal={arXiv preprint arXiv:2601.18900},
+  year={2026}
+}
 ```
 
 ---
